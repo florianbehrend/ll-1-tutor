@@ -1,0 +1,16 @@
+input[type=checkbox]{
+    -moz-appearance:none;
+    -webkit-appearance:none;
+    -o-appearance:none;
+    appearance: none;
+    vertical-align: sub;
+}
+
+input[type=checkbox]:checked {
+    -moz-appearance:auto;
+    -webkit-appearance:auto;
+    -o-appearance:auto;
+    appearance: auto;
+    width: 18px;
+    height: 18px;
+}

@@ -1,0 +1,44 @@
+#root{
+  height: 100vh;
+}
+
+.App {
+  text-align: center;
+  height: 100%;
+  /* justify-content: center; */
+  /* display: flex; */
+}
+
+.App-header{
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  flex-direction: column;
+  align-items: center;
+
+}
+
+.Mui-disabled{
+  --tw-text-opacity: 1;
+  color: rgb(254 240 138 / var(--tw-text-opacity)) !important;
+}
+
+.Mui-active{
+  --tw-text-opacity: 1;
+  color: rgb(14 165 233 / var(--tw-text-opacity)) !important;
+}
+
+.Mui-completed{
+  --tw-text-opacity: 1;
+  color: rgb(34 197 94 / var(--tw-text-opacity)) !important;
+}
+
+.Mui-disabled > .MuiSvgIcon-root{
+  --tw-text-opacity: 1;
+  color: rgb(254 240 138 / var(--tw-text-opacity));
+}
+
+.MuiStepIcon-text{
+  fill: black !important;
+}
+

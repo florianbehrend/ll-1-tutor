@@ -1,0 +1,42 @@
+.react-flow__attribution{
+    --tw-bg-opacity: 1;
+    background-color: rgb(24 24 27 / var(--tw-bg-opacity));
+}
+
+.react-flow__controls-button{
+    background: transparent;
+    border: none;
+}
+
+.react-flow__controls-button:hover{
+    --tw-bg-opacity: 1;
+    background-color: rgb(39 39 42 / var(--tw-bg-opacity));
+}
+
+.react-flow__controls-button path {
+    fill: #fef08a;
+}
+
+.node {
+    padding: 4px;
+    border-radius: 10px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: grab;
+  }
+
+  .dependency-node {
+    height: 50px;
+    width: 50px;
+    border: 1px solid #eee;
+    border-radius: 50px;
+    padding: 5px;
+    background: white;
+  }
+  
+  .text-updater-node label {
+    display: block;
+    color: #777;
+    font-size: 12px;
+  }
