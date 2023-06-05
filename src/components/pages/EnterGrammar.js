@@ -108,6 +108,12 @@ export default function EnterGrammar () {
     handleChange();
   }
 
+  const exampleTwo = () => {
+    const example = "E -> E + T | T\nT -> T * F | F | G\nF -> ( E ) | name | int\nG -> e | g";
+    grammarRef.current.value = example;
+    handleChange();
+  }
+
   return (
     <div className='flex flex-col w-full justify-between'>
       <div className='flex flex-row'>
@@ -141,8 +147,9 @@ export default function EnterGrammar () {
               ))}
             </ul>
           </div>
-          <div>
+          <div className='flex justify-around'>
             <div onClick={exampleOne} className='underline hover:cursor-pointer'>Example 1</div>
+            <div onClick={exampleTwo} className='underline hover:cursor-pointer'>Example 2</div>
           </div>
         </div>
       </div>

@@ -2,7 +2,8 @@ import React, {useContext, useState, useRef, createRef}  from 'react';
 import Button from "../components/Button";
 import { StepperContext } from "../context/StepperContext";
 import {StoredContext} from '../context/StoredContext';
-import CheckBox from '../components/Checkbox';
+import NullableTable from '../components/NullableTable';
+import {highlightProduction, highlightCheckbox, stopSteps} from '../utils/utils';
 
 const stepDesc = [
     {'key': 0, 'msg': 'Please check the boxes if the nonterminal is nullable.'},
@@ -12,9 +13,9 @@ const stepDesc = [
 ]
 const modifiedList = [];
 const timeOut = [];
-let newNullableNonterminalsFound = true;
+let newNullableNonterminalsFound = false;
 //let stepStateRunning = false;
-const nullableSet = new Set();
+//const nullableSet = new Set();
 
 const getEmptyProduction = (grammarObj, nullableSet = new Set()) => {
     //console.log(grammarObj);
@@ -62,7 +63,7 @@ const calculateNullable = (grammarObj, nullableSet) => {
     return nullableSet;
 }
 
-function iterateProductions(grammarObj, productionRef, checkBoxRef) {
+function iterateProductions(grammarObj, productionRef, checkBoxRef, nullableSet) {
     let counter = 1;
     //stepStateRunning = true;
     newNullableNonterminalsFound = false;
@@ -72,16 +73,19 @@ function iterateProductions(grammarObj, productionRef, checkBoxRef) {
           );
         if(consistOfNonterminal) {
             if(!nullableSet.has(lhs)){
-                const isNullable = rhs.every((symbol) =>
-                    nullableSet.has(symbol)
-                );
+                const isNullable = rhs.every((symbol) => {
+                    console.log(symbol);
+                    console.log(nullableSet);
+                    return nullableSet.has(symbol);
+            });
+                console.log(lhs + " + " + rhs + " + nullable " + isNullable);
                 if (isNullable) {
                     nullableSet.add(lhs);
                     newNullableNonterminalsFound = true;
-                    highlightProduction(productionRef.current[index], counter, "text-green-500");
-                    highlightCheckbox(checkBoxRef.current[grammarObj.nonTerminals.indexOf(lhs)-1], counter);
+                    highlightProduction(productionRef.current[index], counter, index, undefined, timeOut, "text-green-500");
+                    highlightCheckbox(checkBoxRef.current[grammarObj.nonTerminals.indexOf(lhs)-1], counter, timeOut);
                 }
-                highlightProduction(productionRef.current[index], counter);
+                highlightProduction(productionRef.current[index], counter, index, undefined, timeOut);
                 counter++;
                 modifiedList.push(index);
             }
@@ -90,7 +94,7 @@ function iterateProductions(grammarObj, productionRef, checkBoxRef) {
     return counter;
 }
 
-async function highlightProduction(productionRef, counter, color="text-sky-500"){
+/*async function highlightProduction(productionRef, counter, color="text-sky-500"){
     timeOut.push(setTimeout(() => productionRef.current.classList.add(color, "font-bold"), counter * 1000));
     //productionRef.current.classList.add("text-sky-500", "font-bold");
 }
@@ -113,7 +117,7 @@ function stopSteps(productionRef){
     removeHighlight(productionRef);
     timeOut.length = 0;
     //stepStateRunning = false;
-}
+}*/
 
 
 export default function NullableSet ({children, className, containerClassName,  ...props}) {
@@ -121,6 +125,9 @@ export default function NullableSet ({children, className, containerClassName,  
   const {activeStep, setActiveStep} = useContext(StepperContext);
   //const {grammar, setGrammar} = useContext(StoredContext);
   const {grammarObj, setGrammarObj} = useContext(StoredContext);
+  const {nullableSet, setNullableSet} = useContext(StoredContext);
+  const {activeRow, setActiveRow} = useContext(StoredContext);
+
   const [stepState, setStepState] = useState(0);
   const [solved, setSolved] = useState(false);
   const [refresh, setRefresh] = useState();
@@ -128,20 +135,23 @@ export default function NullableSet ({children, className, containerClassName,  
 
 
   const checkBoxRef = useRef(grammarObj.nonTerminals.slice(1).map(() => createRef()));
+  const rowRef = useRef(grammarObj.nonTerminals.slice(1).map(() => createRef()));
   const productionRef = useRef(grammarObj.productions.slice(0,-1).map(() => createRef()));
   const textRef = useRef();
 
   const handleNext = () => {    
     setActiveStep((prevActiveStep) => prevActiveStep + 1);
-    nullableSet.clear();
+    setNullableSet(nullableSet);
+    //nullableSet.clear();
     setStepStateRunning(false);
+    setActiveRow(grammarObj.nonTerminals.slice(1).map(() => false));
   };
 
   const handleBack = () => {
     setActiveStep((prevActiveStep) => prevActiveStep - 1);
     nullableSet.clear();
     setStepStateRunning(false);
-    newNullableNonterminalsFound = true;
+    newNullableNonterminalsFound = false;
   };
 
   const handleCheck = () => {
@@ -160,44 +170,50 @@ export default function NullableSet ({children, className, containerClassName,  
         }
     });
     setSolved(solvedCorrect);
-    if (solvedCorrect) {setStepState(stepDesc.length-1)};
+    if (solvedCorrect) {setStepState(stepDesc.length-1); setNullableSet(nullableSet)};
     console.log("State: " + stepState);
   }
 
   const handleStep = () => {
     console.log(stepState);
     setStepStateRunning(true);
-    stopSteps(productionRef);
+    stopSteps(productionRef, modifiedList, timeOut);
     if(!newNullableNonterminalsFound || stepState < 2) {setStepState(stepState+1)};
+    console.log(nullableSet);
 
     switch (stepState === 0 || stepState === 1 ? stepState+1 : stepState) {
         case 1:
             let counter = 1;
-            getEmptyProduction(grammarObj, nullableSet).forEach(index => {
-                highlightProduction(productionRef.current[index], counter, "text-green-500");
+            const emptyProduction = getEmptyProduction(grammarObj, nullableSet)
+            emptyProduction.forEach(index => {
+                highlightProduction(productionRef.current[index], counter, index, undefined, timeOut, "text-green-500");
                 //productionRef.current[index].current.classList.add("text-sky-500", "font-bold");
                 modifiedList.push(index);
                 counter++;
             });
+            if(emptyProduction.length >= 1){newNullableNonterminalsFound = true};
             counter = 1;
             nullableSet.forEach(item => {
-                highlightCheckbox(checkBoxRef.current[grammarObj.nonTerminals.indexOf(item)-1], counter);
+                highlightCheckbox(checkBoxRef.current[grammarObj.nonTerminals.indexOf(item)-1], counter, timeOut);
                 counter++;
             });
             timeOut.push(setTimeout(() => {setStepStateRunning(false); setRefresh(!refresh)}, counter * 1000));
             break;
         case 2:
             console.log(newNullableNonterminalsFound);
-            const highestIndex = iterateProductions(grammarObj, productionRef, checkBoxRef);
-            console.log("Works??? 1")
-            timeOut.push(setTimeout(() => {console.log(stepStateRunning); setStepStateRunning(false); console.log("Works???")}, highestIndex * 1000));
-            console.log("High: " + highestIndex);
+            if(newNullableNonterminalsFound){
+                const highestIndex = iterateProductions(grammarObj, productionRef, checkBoxRef, nullableSet);
+                console.log("Works??? 1")
+                timeOut.push(setTimeout(() => {console.log(stepStateRunning); setStepStateRunning(false); console.log("Works???")}, highestIndex * 1000));
+                console.log("High: " + highestIndex);
+            }
             //setRefresh(true);
             if(stepState <= 2 && newNullableNonterminalsFound){
                 //setStepState(2);
                 console.log("eigentlich");
             }else{
                 setStepState(3);
+                handleCheck();
             };
             break;
         case 3:
@@ -211,7 +227,7 @@ export default function NullableSet ({children, className, containerClassName,  
 
   const handleSolved = () => {
     setStepStateRunning(false);
-    stopSteps(productionRef);
+    stopSteps(productionRef, modifiedList, timeOut);
     setSolved((current) => !current);
     const nullableSetChecked = new Set();
     const nullableSet = calculateNullable(grammarObj, nullableSetChecked);
@@ -225,6 +241,7 @@ export default function NullableSet ({children, className, containerClassName,  
     });
     //console.log(nullableSet);
     setStepState(stepDesc.length-1);
+    setNullableSet(nullableSet);
   };
 
   const checkedChange = (event) => {
@@ -252,6 +269,9 @@ export default function NullableSet ({children, className, containerClassName,  
 
   return (
     <div className='flex flex-col w-full h-full'>
+        <div className='border-2 border-solid rounded-lg border-color mb-1 p-2'> 
+            <p ref={textRef} className='whitespace-pre-line'>{stepDesc[stepState].msg}</p>
+        </div>
          <div className='flex h-full'>
             <div className='w-1/3 border-2 border-solid rounded-lg border-color p-2 text-left overflow-scroll'>
                 {grammarObj.productions.slice(0, -1).map((item, index) => (
@@ -259,26 +279,7 @@ export default function NullableSet ({children, className, containerClassName,  
                     ))}
             </div>
             <div className='w-2/3 border-2 border-solid rounded-lg border-color ml-2 p-2 h-full'>
-                <p ref={textRef} className='whitespace-pre-line'>{stepDesc[stepState].msg}</p>
-                <div className='flex items-center justify-center m-2'>
-                    <table className='border'>
-                    <thead>
-                        <tr class="border-b bg-zinc-800">
-                            <th className='border-r'>Nonterminal</th>
-                            <th>isEmpty?</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {grammarObj.nonTerminals.slice(1).map((item, index) => (
-                            <tr class="border-b bg-zinc-800">
-                                <td className='max-h-6 flex justify-center border-r'><p>{item}</p></td>
-                                <td className='max-h-6'><CheckBox inputRef={checkBoxRef.current[index]} onClick={checkedChange}/></td>
-                            </tr>
-                        ))}
-                    </tbody>
-                    </table>
-                    
-                </div>
+                <NullableTable grammarObj={grammarObj} checkBoxRef={checkBoxRef} checkedChange={checkedChange} editable={true} active={grammarObj.nonTerminals.slice(1).map(() => false)}/>
                 {!solved && <div className='flex justify-evenly'>
                     <p>{"Nullable-Set: (" + [...nullableSet].join(", ") + ")"}</p>
                     {<p>{"new nullable nonterminals found: " + newNullableNonterminalsFound}</p>}
@@ -289,7 +290,7 @@ export default function NullableSet ({children, className, containerClassName,  
             <Button variant="contained" sx={{ mt: 3, ml: 1 }} onClick={handleBack}>
             Back
             </Button>
-            <Button variant="contained" sx={{ mt: 3, ml: 1 }} onClick={handleStep}>
+            <Button variant="contained" sx={{ mt: 3, ml: 1 }} onClick={handleStep} disabled={stepStateRunning}>
                 {stepState!==stepDesc.length-1 ? (stepStateRunning ? 'Running...' : 'Next Step') : 'Restart'}
             </Button> 
             

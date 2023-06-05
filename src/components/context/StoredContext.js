@@ -12,7 +12,12 @@ export const StoredProvider = ({children}) => {
 
     const [grammar, setGrammar] = useState("");
     const [grammarObj, setGrammarObj] = useState(grammarObject);
-    const value = {grammar, setGrammar, grammarObj, setGrammarObj};
+    const [nullableSet, setNullableSet] = useState(new Set());
+
+    //Context object for Rows of NullableTable to paint them in steps
+    const [activeRow, setActiveRow] = useState([]);
+
+    const value = {grammar, setGrammar, grammarObj, setGrammarObj, nullableSet, setNullableSet, activeRow, setActiveRow};
         
     return (
         <StoredContext.Provider value={value}>

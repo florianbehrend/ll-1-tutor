@@ -28,15 +28,40 @@
 
   .dependency-node {
     height: 50px;
-    width: 50px;
+    width: 70px;
     border: 1px solid #eee;
-    border-radius: 50px;
+    border-radius: 5px;
     padding: 5px;
     background: white;
   }
-  
-  .text-updater-node label {
-    display: block;
-    color: #777;
-    font-size: 12px;
+
+  .dependency-node-active {
+    border: 3px solid #fef08a;
+  }
+
+  .dependency-label{
+    white-space: -moz-pre-wrap; /* Firefox 1.0-2.0 */
+    white-space: pre-wrap;
+    word-wrap: anywhere;  
+  }
+
+  .dependency-label-false{
+    border: 1px solid #ef4444 !important;
+  }
+
+  .dependency-label-correct{
+    border: 1px solid #22c55e !important;
+  }
+
+  .max-w-3{
+    max-width: 65px;
+    font-size: xx-small;
+    padding: 2px;
+    border: 1px solid #18181b;
+    border-radius: 5px;
+    max-lines: 1;
+    overflow-x: scroll;
+    resize: none;
+    background: #18181b;
+    color: #fef08a;
   }

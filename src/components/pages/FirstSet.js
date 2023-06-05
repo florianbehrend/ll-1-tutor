@@ -17,7 +17,7 @@ function check(grammar){
 };
 
 // Function to calculate the first set
-function calculateFirstSetTest(grammar, nonTerminal, calculated = new Map(), firstSetNonTerminal = new Set(), step = 0) {
+function calculateFirstSetTest(grammar, nonTerminal, nullableSet, calculated = new Map(), firstSetNonTerminal = new Set(), step = 0) {
   //console.log(step + " " + nonTerminal);
 
   if (calculated.get(nonTerminal) === undefined){
@@ -37,16 +37,31 @@ function calculateFirstSetTest(grammar, nonTerminal, calculated = new Map(), fir
         // If the rule starts with ε (empty), add ε to the first set
         calculated.get(nonTerminal).add(symbol); 
         console.log(symbol + " added");
-
         break;
-        //console.log(calculated);
-  
       }
+      
       else if (symbol === nonTerminal){
         //TODO Circle in Grammatik und dann nullable
         leftRecursiveProd.push(rule);
         console.log(leftRecursiveProd);
-        break;
+
+        console.log(symbol);
+           /*if (firstSetNonTerminal.has(symbol)){
+            console.log("Visited: ");
+            console.log(calculated.get(nonTerminal));
+            console.log(calculated.get(symbol));
+            calculated.set(nonTerminal, new Set([...calculated.get(nonTerminal), ...calculated.get(symbol)]));
+            console.log(calculated.get(nonTerminal));
+            continue;
+          };
+          firstSetNonTerminal.add(symbol);*/
+          //console.log(firstSetNonTerminal);
+          
+          if (nullableSet.has(symbol)){
+            continue;
+          }else{
+            break;
+          }
       }
       // If the rule starts with a non-terminal symbol
       else {
@@ -61,7 +76,7 @@ function calculateFirstSetTest(grammar, nonTerminal, calculated = new Map(), fir
           };
           firstSetNonTerminal.add(symbol);
           //console.log(firstSetNonTerminal);
-          var symbolFirstSet = calculateFirstSetTest(grammar, symbol, calculated, firstSetNonTerminal, step+1);
+          var symbolFirstSet = calculateFirstSetTest(grammar, symbol, nullableSet, calculated, firstSetNonTerminal, step+1);
           symbolFirstSet.get(symbol).forEach(terminal => {
             if((terminal === 'e' || terminal === 'eps') && i < rule.rhs.length-1){
               console.log("Epls");
@@ -72,7 +87,7 @@ function calculateFirstSetTest(grammar, nonTerminal, calculated = new Map(), fir
             
           });
           
-          console.log(calculated.get(nonTerminal));
+          /*console.log(calculated.get(nonTerminal));
           if (symbolFirstSet.get(symbol).has('e') || symbolFirstSet.get(symbol).has('eps')){
             console.log("Epsilon " + nonTerminal);
             console.log(symbolFirstSet.get(symbol));
@@ -84,7 +99,7 @@ function calculateFirstSetTest(grammar, nonTerminal, calculated = new Map(), fir
           }else{
             console.log("break");
             break;
-          }
+          }*/
   
       }
     }
@@ -147,6 +162,7 @@ export default function FirstSet ({children, className, containerClassName,  ...
   const {activeStep, setActiveStep} = useContext(StepperContext);
   const {grammar, setGrammar} = useContext(StoredContext);
   const {grammarObj, setGrammarObj} = useContext(StoredContext);
+  const {nullableSet, setNullableSet} = useContext(StoredContext);
 
   console.log(grammarObj);
 
@@ -170,7 +186,7 @@ export default function FirstSet ({children, className, containerClassName,  ...
   //TODO add S as start production and start from this terminal
   const handleCheck = () => {
     const firstSetCheck = new Map();
-    const firstSet = calculateFirstSetTest(grammarObj, grammarObj.nonTerminals.includes('S') ? 'S' : grammarObj.nonTerminals[1]);
+    const firstSet = calculateFirstSetTest(grammarObj, grammarObj.nonTerminals.includes('S') ? 'S' : grammarObj.nonTerminals[1], nullableSet);
     console.log("First Set: ");
     console.log(firstSet);
     var solvedCorrect = true;
@@ -209,7 +225,7 @@ export default function FirstSet ({children, className, containerClassName,  ...
 
   const handleSolved = () => {
     setSolved((current) => !current);
-    const firstSet = calculateFirstSetTest(grammarObj, grammarObj.nonTerminals.includes('S') ? 'S' : grammarObj.nonTerminals[1]);
+    const firstSet = calculateFirstSetTest(grammarObj, grammarObj.nonTerminals.includes('S') ? 'S' : grammarObj.nonTerminals[1], nullableSet);
     console.log(firstSet);
     grammarObj.nonTerminals.slice(1).forEach((nonTerminal, index) => {
       if(firstSet.get(nonTerminal) !== undefined){
