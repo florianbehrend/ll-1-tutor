@@ -1,16 +1,24 @@
-import React, {useContext, useRef, useState, createRef}  from 'react';
+import React, {useContext, useRef, useState, createRef, useEffect}  from 'react';
 import Button from "../components/Button";
 import { StepperContext } from "../context/StepperContext";
 import {StoredContext} from '../context/StoredContext';
 import '../layout/EnterGrammar.css';
 import { TextField } from '@mui/material';
+import ReactFlow, { Controls, ReactFlowProvider, useNodesState, useEdgesState} from 'reactflow';
+import DependencyNode from '../components/DependencyNode';
+import { stopTimeout, resetCorrectTemp } from '../utils/utils';
 
 var correctTemp = {};
+const nodesTodo = [];
+const timeOut = [];
+
+const nodeTypes = { dependencyNode: DependencyNode};
+const edgeTypes = { type: 'default'};
 
 function check(grammar){
   grammar.nonTerminals.map((item) => {
     if (correctTemp[item] === undefined) {
-      correctTemp[item] = {correct: false, error: false, helpertext: "wrong elements"}
+      correctTemp[item] = {correct: false, error: false, helpertext: "wrong elements", stepActive: false}
      } ;
     //console.log(correctTemp);
   });
@@ -29,7 +37,9 @@ function calculateFirstSetTest(grammar, nonTerminal, nullableSet, calculated = n
 
   // Process each production rule of the non-terminal
   for (const rule of grammar.productions.filter(e => e.lhs === nonTerminal)) {
+    console.log(rule);
     for(var i = 0; i<rule.rhs.length; i++){
+      let isEmpty = false;
       const symbol = rule.rhs[i];
       if (grammar.terminals.includes(symbol)) {
         //firstSet.add(firstSymbol);
@@ -80,12 +90,17 @@ function calculateFirstSetTest(grammar, nonTerminal, nullableSet, calculated = n
           symbolFirstSet.get(symbol).forEach(terminal => {
             if((terminal === 'e' || terminal === 'eps') && i < rule.rhs.length-1){
               console.log("Epls");
+              isEmpty = true;
             }else{
               calculated.get(nonTerminal).add(terminal); 
               console.log(terminal + " added from");
             }
             
           });
+
+          if(!isEmpty){
+            break;
+          }
           
           /*console.log(calculated.get(nonTerminal));
           if (symbolFirstSet.get(symbol).has('e') || symbolFirstSet.get(symbol).has('eps')){
@@ -138,6 +153,18 @@ function calculateFirstSetTest(grammar, nonTerminal, nullableSet, calculated = n
   return calculated;
 }
 
+function calculateFirstSet(grammarObj, nullableSet){
+  let firstSetTemp = new Map();
+  grammarObj.nonTerminals.slice(1).forEach(nonTerminal => {
+    const firstSet = calculateFirstSetTest(grammarObj, nonTerminal, nullableSet);
+    firstSetTemp = new Map([...firstSetTemp, ...firstSet]);
+    console.log(nonTerminal + " ------------------------------------");
+    console.log(firstSet);
+    console.log(firstSetTemp);
+  })
+  return firstSetTemp;
+}
+
 // Usage example:
 /*const grammar = {
   nonTerminals: ['X', 'T', 'S', 'R'],
@@ -163,30 +190,40 @@ export default function FirstSet ({children, className, containerClassName,  ...
   const {grammar, setGrammar} = useContext(StoredContext);
   const {grammarObj, setGrammarObj} = useContext(StoredContext);
   const {nullableSet, setNullableSet} = useContext(StoredContext);
-
-  console.log(grammarObj);
+  const {firstSet, setFirstSet} = useContext(StoredContext);
+  const {storedNodes, setStoredNodes} = useContext(StoredContext);
+  const {storedEdges, setStoredEdges} = useContext(StoredContext);
 
   const [solved, setSolved] = useState(false);
 
   check(grammarObj);
   const [refresh, setRefresh] = useState();
 
-  const elementsRef = useRef(grammarObj.nonTerminals.map(() => createRef()));
+  const elementsRef = useRef(grammarObj.nonTerminals.slice(1).map(() => createRef()));
   //console.log(elementsRef);
+
+  const reactFlowWrapper = useRef(null);
+  const [nodes, setNodes, onNodesChange] = useNodesState(storedNodes);
+  const [edges, setEdges, onEdgesChange] = useEdgesState(storedEdges);
+  const [reactFlowInstance, setReactFlowInstance] = useState(null);
+  const [stepState, setStepState] = useState(0);
+  const [stepStateRunning, setStepStateRunning] = useState(false);
 
   const handleNext = () => {    
     setActiveStep((prevActiveStep) => prevActiveStep + 1);
+    correctTemp = {};
   };
 
   const handleBack = () => {
     setActiveStep((prevActiveStep) => prevActiveStep - 1);
+    nodesTodo.length = 0;
     correctTemp = {};
   };
 
   //TODO add S as start production and start from this terminal
   const handleCheck = () => {
     const firstSetCheck = new Map();
-    const firstSet = calculateFirstSetTest(grammarObj, grammarObj.nonTerminals.includes('S') ? 'S' : grammarObj.nonTerminals[1], nullableSet);
+    const firstSet = calculateFirstSet(grammarObj, nullableSet);
     console.log("First Set: ");
     console.log(firstSet);
     var solvedCorrect = true;
@@ -220,12 +257,19 @@ export default function FirstSet ({children, className, containerClassName,  ...
       //console.log(correct);
     });
     setSolved(solvedCorrect);
+    if(solvedCorrect){
+      setFirstSet(firstSet);
+    }
     //setCorrect(true);
   };
 
   const handleSolved = () => {
+    resetNodes();
+    stopTimeout(timeOut);
+    setStepStateRunning(false);
     setSolved((current) => !current);
-    const firstSet = calculateFirstSetTest(grammarObj, grammarObj.nonTerminals.includes('S') ? 'S' : grammarObj.nonTerminals[1], nullableSet);
+    const firstSet = calculateFirstSet(grammarObj, nullableSet);
+    //const firstSet = calculateFirstSetTest(grammarObj, grammarObj.nonTerminals.includes('S') ? 'S' : grammarObj.nonTerminals[1], nullableSet);
     console.log(firstSet);
     grammarObj.nonTerminals.slice(1).forEach((nonTerminal, index) => {
       if(firstSet.get(nonTerminal) !== undefined){
@@ -234,25 +278,189 @@ export default function FirstSet ({children, className, containerClassName,  ...
         correctTemp[nonTerminal].error = false;
       }
     });
+    setFirstSet(firstSet);
+    setStepState(2);
   };
+
+  const handleStep = () => {
+    setStepStateRunning(true);
+    console.log("TODO: ");
+    console.log(nodesTodo);
+    if(nodesTodo.length === 0) {setStepState(stepState+1)};
+    console.log(stepState);
+    var counter = 0;
+    resetNodes();
+    resetCorrectTemp(correctTemp);
+    //const [dependencies, label] = getDependencies(grammarObj, nullableSet);
+    //stopSteps(productionRef, modifiedList, timeOut);
+    const tempNodes = new Set(grammarObj.nonTerminals.slice(1));
+
+    switch (stepState) {
+      case 0:
+        //Nodes without dependency on other nodes
+        
+        edges.forEach((edge) => {
+          if(edge.target !== edge.source){
+            tempNodes.delete(edge.target);
+          }
+        });
+        console.log(tempNodes);
+        edges.forEach((edge) => {
+          if(tempNodes.has(edge.source)){
+            !nodesTodo.includes(edge.target) && nodesTodo.push(edge.target);
+          }
+        });
+        nodes.filter((node) => tempNodes.has(node.id)).forEach((node) => {
+          console.log(node);
+          timeOut.push(setTimeout(() => {elementsRef.current[node.data.index].current.value = (node.data.active ? "e, " : "") + node.data.ref.current.value;}, counter * 1000));
+          highlightNode(node.data.index, counter);
+          counter++;
+        });
+        timeOut.push(setTimeout(() => {setStepStateRunning(false);}, counter * 1000));
+        console.log(nodesTodo);
+        break;
+      case 1:
+        nodes.filter((node) => nodesTodo.includes(node.id)).forEach((node) => {
+          console.log(node);
+          elementsRef.current[node.data.index].current.value = (node.data.active ? "e, " : "") + node.data.ref.current.value;
+          edges.filter((edge) => edge.target === node.id && edge.target !== edge.source).forEach((edge) => {
+            console.log(edge);
+            //const test = new Set([...elementsRef.current[node.data.index].current.value.split(", "), ...elementsRef.current[nodes.find((node) => node.id === edge.source).data.index].current.value.split(", ").filter(x => x !== "e" && x !== "eps")]);
+            timeOut.push(setTimeout(() => {
+              const test = new Set([...elementsRef.current[node.data.index].current.value.split(", ").filter((str) => str !== ""), ...elementsRef.current[nodes.find((node) => node.id === edge.source).data.index].current.value.split(", ").filter(x => x !== "e" && x !== "eps")]);
+              elementsRef.current[node.data.index].current.value = [...test].join(", ");
+            }, counter * 1000));
+            highlightNode(node.data.index, counter);
+          });
+          counter++;
+        });
+
+        console.log(nodes);
+        
+        let index = nodesTodo.length;
+        while(index > 0){
+          const id = nodesTodo.shift();
+          edges.forEach((edge) => {
+            if(id === edge.source && edge.target !== edge.source){
+              !nodesTodo.includes(edge.target) && nodesTodo.push(edge.target);
+            }
+          });
+          index--;
+        }
+
+        if(nodesTodo.length === 0){
+          timeOut.push(setTimeout(() => {
+            handleCheck();
+            setStepState(stepState+1);
+            resetNodes();
+          }, counter * 1000));
+        }
+        timeOut.push(setTimeout(() => {setStepStateRunning(false);}, counter * 1000));
+        break;
+      default:
+        reset();
+        break;
+    }
+
+    
+  }
+
+  async function highlightNode(index, counter) {
+    timeOut.push(setTimeout(() => {
+      //nodes[index].data.active = true;
+      setNodes((nds) =>
+        nds.map((node) => {
+          if (node.data.index === index) {
+            // it's important that you create a new object here
+            // in order to notify react flow about the change
+            node.data = {
+              ...node.data,
+              stepActive: true,
+            };
+            correctTemp[node.id].stepActive = true;
+          }
+
+          return node;
+        })
+      );
+    }, counter * 1000));
+  }
+
+  const reset = () => {
+    setStepStateRunning(false);
+    setStepState(0);
+    //stopSteps(productionRef, modifiedList, timeOut);
+    setSolved(false);
+    elementsRef.current.forEach((textInput) => textInput.current.value = "");
+    resetCorrectTemp(correctTemp);
+    resetNodes();
+    nodesTodo.length = 0;
+  }
+
+  const resetNodes = () => {
+    setNodes((nds) =>
+      nds.map((node) => {
+          node.data = {
+            ...node.data,
+            stepActive: false,
+          };
+          //console.log(node.id);
+          correctTemp[node.id].stepActive = false;
+        return node;
+      })
+    );
+  }
 
   //const startProduction = [grammarObj.nonTerminals.includes('S') ? "S' -> S $" : "S' -> " + grammarObj.nonTerminals[1] + " $"];
   const productionList = [/*...startProduction, */...grammar.split("\n")];
   //productionList.push("S' -> " + grammarObj.nonTerminals[1] + " $" );
   const convention = 'Please enter the FirstSets according to the following pattern: <terminal>, <terminal>, ...';
 
-  
+  useEffect(() => {
+    nodes.forEach((node) => {
+      if(node.data.ref.current !== null){
+        node.data.ref.current.value = node.data.text;
+        node.data.ref.current.disabled = true;
+        node.data.disabled = true;
+      }
+      console.log(node.data.ref.current);
+    });
+  }, [reactFlowInstance]);
+
   //setCorrect(correctTemp);
 
   return (
-    <div className='w-full'>
+    <div className='flex flex-col w-full h-full'>
         {children}
-        <div className='flex'>
-          <div className='w-1/3 border-2 border-solid rounded-lg border-color p-2 text-left overflow-scroll'>
-            {productionList.map(item => (
-                    <p>{item}</p>
-                  ))}
-          </div>
+        <div className='flex h-full'>
+          <div className='w-1/3'>
+            <div className='h-1/2 border-2 border-solid rounded-lg border-color p-2 text-left overflow-scroll'>
+                {productionList.map(item => (
+                        <p>{item}</p>
+                      ))}
+              </div>
+              <div className='h-1/2 border-2 border-solid rounded-bl-lg border-color mt-1'>
+                <ReactFlowProvider>
+                    <div className="reactflow-wrapper h-full" ref={reactFlowWrapper}>
+                      <ReactFlow
+                        nodes={nodes}
+                        edges={edges}
+                        onInit={setReactFlowInstance}
+                        snapToGrid
+                        fitView
+                        nodesDraggable={false}
+                        nodesConnectable={false}
+                        nodesFocusable={false}
+                        zoomOnDoubleClick={false}
+                        nodeTypes={nodeTypes}
+                        edgeTypes={edgeTypes}
+                        deleteKeyCode={null}
+                      >
+                      </ReactFlow>
+                    </div>
+                  </ReactFlowProvider>
+              </div>
+            </div>
           <div className='flex flex-col w-2/3'>
             <p>{convention}</p>
             {grammarObj.nonTerminals.slice(1).map((item, index) => (
@@ -261,7 +469,7 @@ export default function FirstSet ({children, className, containerClassName,  ...
                 <TextField inputRef={elementsRef.current[index]} key={item} className='w-4/5'
                   sx={{
                     "& .MuiOutlinedInput-root": {
-                      "& > fieldset": correctTemp[item].correct ? {borderColor: "#22c55e", borderWidth: 2} : { borderColor: "#2f2f2f", borderWidth: 2},
+                      "& > fieldset": correctTemp[item].correct ? {borderColor: "#22c55e", borderWidth: 2} : correctTemp[item].stepActive ?  {borderColor: "#0ea5e9", borderWidth: 2} : {borderColor: "#2f2f2f", borderWidth: 2},
                     },
                     "& .MuiOutlinedInput-root:hover": { 
                       "& > fieldset": { borderColor: "#fde047", borderWidth: 3},
@@ -275,16 +483,16 @@ export default function FirstSet ({children, className, containerClassName,  ...
             ))}
           </div>
         </div>
-        <div className='flex justify-evenly'>
+        <div className=''>
           <Button onClick={handleBack}>
             Back
           </Button>
-          <Button onClick={handleCheck}>
-            Next Step
-          </Button>
-          <Button onClick={handleCheck}>
+          <Button variant="contained" sx={{ mt: 3, ml: 1 }} onClick={handleStep} disabled={stepStateRunning}>
+                {stepState!==2 ? (stepStateRunning ? 'Running...' : 'Next Step') : 'Restart'}
+            </Button> 
+            <Button className={solved && "opacity-50"} variant="contained" sx={{ mt: 3, ml: 1 }} onClick={handleCheck} disabled={solved}>
             Check
-          </Button>
+            </Button>
           {solved
             ? <Button onClick={handleNext}>Next</Button>
             : <Button onClick={handleSolved}>Solve</Button>     

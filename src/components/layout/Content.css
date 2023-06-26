@@ -7,3 +7,15 @@
     margin: auto;
     padding: 0 2em 0 2em;
 }
+
+.max-w-4{
+    max-width: 5rem;
+    font-size: smaller;
+    padding: 0.25rem;
+}
+
+.field-error{
+    border: 1px solid #d32f2f;
+    border-radius: 5px;
+    padding: 1px;
+}

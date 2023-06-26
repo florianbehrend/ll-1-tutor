@@ -72,12 +72,13 @@ export default function EnterGrammar () {
     }
 
     grammar.terminals = grammar.terminals.filter(e => !grammar.nonTerminals.includes(e));
+    grammar.productions = grammar.productions.sort((a, b) => a.lhs.localeCompare(b.lhs));
     if(grammar.nonTerminals.includes('S')){
       grammar.productions.push({lhs: grammar.startSymbol, rhs: ['S', '$']});
     }else{
       grammar.productions.push({lhs: grammar.startSymbol, rhs: [grammar.nonTerminals[1], '$']});
     }
-    //console.log(grammarObj);
+    console.log(grammar);
     setGrammarObj(grammar);
     return false;
   };
@@ -110,6 +111,18 @@ export default function EnterGrammar () {
 
   const exampleTwo = () => {
     const example = "E -> E + T | T\nT -> T * F | F | G\nF -> ( E ) | name | int\nG -> e | g";
+    grammarRef.current.value = example;
+    handleChange();
+  }
+
+  const exampleThree = () => {
+    const example = "S -> prn E T\nT -> prn E T | e\nE -> num | bop E E | uop E";
+    grammarRef.current.value = example;
+    handleChange();
+  }
+
+  const exampleFour = () => {
+    const example = "E -> T R\nR -> e\nR -> + E\nT -> F X\nX -> e\nX -> * T\nF -> n\nF -> ( E )";
     grammarRef.current.value = example;
     handleChange();
   }
@@ -150,6 +163,8 @@ export default function EnterGrammar () {
           <div className='flex justify-around'>
             <div onClick={exampleOne} className='underline hover:cursor-pointer'>Example 1</div>
             <div onClick={exampleTwo} className='underline hover:cursor-pointer'>Example 2</div>
+            <div onClick={exampleThree} className='underline hover:cursor-pointer'>Example 3</div>
+            <div onClick={exampleFour} className='underline hover:cursor-pointer'>Example 4</div>
           </div>
         </div>
       </div>

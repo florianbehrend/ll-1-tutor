@@ -19,7 +19,7 @@ const setSize = (text) => {
 };
 
 const clickHandler = (event) => {
-  if(event.detail == 2){
+  if(event.detail == 2 && !data.disabled){
     setActive(!active); //for refresh
     data.active = !data.active;
   }
@@ -27,7 +27,7 @@ const clickHandler = (event) => {
 
   return (
     <StoredContext.Consumer>
-      {val => (<div className={"dependency-node flex justify-center items-center overflow-hidden" + (data.active ? " dependency-node-active" : "")} onClick={clickHandler}>
+      {val => (<div className={"dependency-node flex justify-center items-center overflow-hidden" + (data.active ? " dependency-node-active" : "") + (data.stepActive ? " dependency-node-stepactive" : "")} onClick={clickHandler}>
         <div id="text" name="text" onChange={onChange} className="flex flex-col justify-center items-center">
           <label className='dependency-label' htmlFor="text" style={{fontSize: setSize(data.label) + 'px'}}>{data.label}</label>
           <input className='max-w-3 focus:outline-none' type="text" rows={1} ref={data.ref}/>

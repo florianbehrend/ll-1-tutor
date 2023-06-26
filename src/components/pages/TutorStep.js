@@ -9,10 +9,9 @@ import EnterGrammar from "../pages/EnterGrammar";
 import FirstSet from '../pages/FirstSet';
 import FollowSet from '../pages/FollowSet';
 import LookUpTable from '../pages/LookUpTable';
-import CheckGrammar from '../pages/CheckGrammar';
 import LLParser from '../pages/LLParser';
 import DependencyGraph from '../pages/DependencyGraph';
-import NullableSet from "./NullableSet";
+import EmptySet from "./EmptySet";
 import {createTheme, ThemeProvider} from '@mui/material/styles';
 
 
@@ -35,7 +34,7 @@ const handleSteps = (step) => {
       case 0:
         return <EnterGrammar />;
       case 1:
-        return <NullableSet/>
+        return <EmptySet/>
       case 2:
         return <DependencyGraph/>;
       case 3:
@@ -45,8 +44,6 @@ const handleSteps = (step) => {
       case 5:
         return <LookUpTable />;
       case 6:
-        return <CheckGrammar />;
-      case 7:
         return <LLParser />;
       default:
         throw new Error("Unknown step");

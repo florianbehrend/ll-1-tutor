@@ -120,7 +120,7 @@ function stopSteps(productionRef){
 }*/
 
 
-export default function NullableSet ({children, className, containerClassName,  ...props}) {
+export default function EmptySet ({children, className, containerClassName,  ...props}) {
 
   const {activeStep, setActiveStep} = useContext(StepperContext);
   //const {grammar, setGrammar} = useContext(StoredContext);
@@ -163,8 +163,10 @@ export default function NullableSet ({children, className, containerClassName,  
         if ((nullableSet.has(symbol) && checkBoxRef.current[index].current.checked) || (!nullableSet.has(symbol) && !checkBoxRef.current[index].current.checked)){
             console.log("Schon richtig... " + symbol);
             checkBoxRef.current[index].current.classList.add("accent-green-500", "border-green-500");
+            checkBoxRef.current[index].current.classList.remove("accent-yellow-200");
         }else {
             checkBoxRef.current[index].current.classList.add("accent-red-500", "border-red-500");
+            checkBoxRef.current[index].current.classList.remove("accent-yellow-200");
             console.log("Schon falsch...");
             solvedCorrect = false;
         }
@@ -238,14 +240,17 @@ export default function NullableSet ({children, className, containerClassName,  
             checkBoxRef.current[index].current.checked = false;
         };
         checkBoxRef.current[index].current.classList.add("accent-green-500", "border-green-500");
+        checkBoxRef.current[index].current.classList.remove("accent-yellow-200");
     });
     //console.log(nullableSet);
     setStepState(stepDesc.length-1);
     setNullableSet(nullableSet);
+    handleCheck();
   };
 
   const checkedChange = (event) => {
     event.target.classList.remove("accent-red-500", "border-red-500", "accent-green-500", "border-green-500");
+    event.target.classList.add("accent-yellow-200");
   }
 
   const reset = () => {
@@ -259,6 +264,8 @@ export default function NullableSet ({children, className, containerClassName,  
     checkBoxRef.current.forEach(item => {
         item.current.checked = false;
         item.current.classList.remove("accent-red-500", "border-red-500", "accent-green-500", "border-green-500");
+        item.current.classList.add("accent-yellow-200");
+
     })
   }
 
@@ -294,7 +301,7 @@ export default function NullableSet ({children, className, containerClassName,  
                 {stepState!==stepDesc.length-1 ? (stepStateRunning ? 'Running...' : 'Next Step') : 'Restart'}
             </Button> 
             
-            <Button variant="contained" sx={{ mt: 3, ml: 1 }} onClick={handleCheck}>
+            <Button className={solved && "opacity-50"} variant="contained" sx={{ mt: 3, ml: 1 }} onClick={handleCheck} disabled={solved}>
             Check
             </Button>
             {solved

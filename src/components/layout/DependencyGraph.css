@@ -39,6 +39,10 @@
     border: 3px solid #fef08a;
   }
 
+  .dependency-node-stepactive {
+    outline: 2px solid #0ea5e9;
+  }
+
   .dependency-label{
     white-space: -moz-pre-wrap; /* Firefox 1.0-2.0 */
     white-space: pre-wrap;

@@ -2,14 +2,12 @@ import React, {useContext, useRef, useState, useCallback, useEffect, createRef} 
 import Button from "../components/Button";
 import { StepperContext } from "../context/StepperContext";
 import {StoredContext} from '../context/StoredContext';
-import ReactFlow, { Controls, Background, MarkerType, ReactFlowProvider, addEdge, useNodesState, useEdgesState, updateEdge} from 'reactflow';
+import ReactFlow, { Controls, MarkerType, ReactFlowProvider, addEdge, useNodesState, useEdgesState, updateEdge} from 'reactflow';
 import 'reactflow/dist/style.css';
 import '../layout/DependencyGraph.css';
 import AddNodes from '../components/AddNodes';
 import DependencyNode from '../components/DependencyNode';
-import SelfConnectingEdge from '../components/SelfConnectingEdge';
-import dagre, { GraphLabel } from 'dagre';
-import { type } from '@testing-library/user-event/dist/type';
+import dagre from 'dagre';
 import NullableTable from '../components/NullableTable';
 import {highlightProduction, removeHighlight, removeHighlightAll, stopSteps} from '../utils/utils';
 
@@ -82,6 +80,8 @@ export default function DependencyGraph ({children, className, containerClassNam
   const {grammarObj, setGrammarObj} = useContext(StoredContext);
   const {nullableSet, setNullableSet} = useContext(StoredContext);
   const {activeRow, setActiveRow} = useContext(StoredContext);
+  const {storedNodes, setStoredNodes} = useContext(StoredContext);
+  const {storedEdges, setStoredEdges} = useContext(StoredContext);
 
   const [stepState, setStepState] = useState(0);
   const [solved, setSolved] = useState(false);
@@ -97,12 +97,23 @@ export default function DependencyGraph ({children, className, containerClassNam
   const productionFieldRef = useRef();
   const edgeUpdateSuccessful = useRef(true);
   const errorRef = useRef();
+  const errorRefEmpty = useRef();
+  const errorRefMany = useRef();
+  const errorRefWrong = useRef();
 
   let id = 0;
   const getId = () => `node_${id++}`;
 
-  const handleNext = () => {    
-    setActiveStep((prevActiveStep) => prevActiveStep + 1);
+  const handleNext = () => { 
+    
+    if(handleCheck()){
+      setActiveStep((prevActiveStep) => prevActiveStep + 1);
+      nodes.forEach(node => {
+        node.data.text = node.data.ref.current.value;
+      });
+      setStoredEdges(edges);
+      setStoredNodes(nodes);
+    }   
   };
 
   const handleBack = () => {
@@ -223,10 +234,11 @@ export default function DependencyGraph ({children, className, containerClassNam
 
   const handleStep = () => {
     //console.log(stepState);
+    //TODO remove everything from checked (error message and color)
     setStepStateRunning(true);
     if(stepState <= 4) {setStepState(stepState+1)};
     var counter = 0;
-    const [dependencies, label] = getDependencies(grammarObj, nullableSet);
+    //const [dependencies, label] = getDependencies(grammarObj, nullableSet);
     stopSteps(productionRef, modifiedList, timeOut);
 
     switch (stepState) {
@@ -242,7 +254,6 @@ export default function DependencyGraph ({children, className, containerClassNam
         break;
       case 1:
         //setStepState(stepState+1);
-        console.log(productionFieldRef);
         setActiveRow(grammarObj.nonTerminals.slice(1).map(() => false));
         var highlighted = false;
 
@@ -279,7 +290,7 @@ export default function DependencyGraph ({children, className, containerClassNam
         
         break;
       case 2:
-        console.log(productionFieldRef);
+        //console.log(productionFieldRef);
         setActiveRow(grammarObj.nonTerminals.slice(1).map(() => false));
         const tempNonterminals = [...grammarObj.nonTerminals];
         var highlighted = false;
@@ -313,7 +324,6 @@ export default function DependencyGraph ({children, className, containerClassNam
         timeOut.push(setTimeout(() => {setStepStateRunning(false); setRefresh(!refresh)}, counter * 1000));
         break;
       default:
-        setStepStateRunning(false);
         reset();
         break;
     }
@@ -371,6 +381,12 @@ export default function DependencyGraph ({children, className, containerClassNam
     setStepState(4);
     setSolved(true);
 
+    errorRefEmpty.current.hidden = true;
+    errorRef.current.hidden = true;
+    errorRefMany.current.hidden = true;
+    errorRefWrong.current.hidden = true;
+
+
     setEdges(initialEdges);
 
     const [dependencies, label] = getDependencies(grammarObj, nullableSet);
@@ -421,42 +437,51 @@ export default function DependencyGraph ({children, className, containerClassNam
     //reactFlowInstance.fitView();
     const [dependencies, label] = getDependencies(grammarObj, nullableSet);
     var solvedCorrect = true;
-    var correct = false;
+    var correct = true;
+    const errorNodesEmpty = [];
+    const errorNodesFirstTooMany = [];
+    const errorNodesFirstTooFew = [];
+    const errorNodesFirstWrong = [];
 
     grammarObj.nonTerminals.slice(1).forEach((symbol, index) => {
       nodes[index].data.ref.current.classList.remove("dependency-label-false", "dependency-label-correct");
       //console.log(nodes[index].data.active);
       //when field is empty
       if(label.get(symbol).size === 0){
-        label.get(symbol).add("");
+        //label.get(symbol).add("");
       }
       const userInput = textInputRef.current[index].current.value.split(", ").map((symbol) => symbol.trim()).filter((symbol) => symbol !== "");
       const difference = new Set([...label.get(symbol)].filter(x => !userInput.includes(x)));
       
       console.log(label.get(symbol));
       console.log(userInput);
+      console.log(difference);
       if (label.get(symbol).size > userInput.length) {
         //correctTemp[nonTerminal].helpertext = "too few elements";
         setSolved(false);
-        console.log("too few elem");
         nodes[index].data.ref.current.classList.add("dependency-label-false");
-        errorRef.current.textContent = "too few elements";
+        errorNodesFirstTooFew.push(symbol);
+        console.log("Häää");
+        correct = false;
       } else if(label.get(symbol).size < userInput.length){
         //correctTemp[nonTerminal].helpertext = "too many elements";
         setSolved(false);
-        console.log(errorRef);
         nodes[index].data.ref.current.classList.add("dependency-label-false");
-        errorRef.current.textContent = "too many elements";
+        errorNodesFirstTooMany.push(symbol);
+        console.log("too many");
+        correct = false;
       } else {
-        correct = difference.size === 0;
         //Bicondition to check nullable marker
         if (!(nullableSet.has(symbol) === nodes[index].data.active)) {
-          console.log("Nullable missing");
+          errorNodesEmpty.push(symbol);
+          console.log("Empty missing");
         }
-        if(correct){
+        if(difference.size === 0){
           nodes[index].data.ref.current.classList.add("dependency-label-correct");
         }else{
           nodes[index].data.ref.current.classList.add("dependency-label-false");
+          errorNodesFirstWrong.push(symbol);
+          correct = false;
         }
         console.log("correct");
       }
@@ -469,16 +494,60 @@ export default function DependencyGraph ({children, className, containerClassNam
       
       //console.log(correctTemp);
     })
-    const totalEdges = [...dependencies.values()].slice(0,-1).reduce(function (acc, dependency) {
-      return acc + dependency.size;
-    }, 0);
 
+    if(errorNodesEmpty.length === 0){
+      errorRefEmpty.current.hidden = true;
+    }else{
+      errorRefEmpty.current.hidden = false;
+      errorRefEmpty.current.textContent = "Check following nodes if you marked them as empty: " + errorNodesEmpty.join(", ");
+    }
+
+    if(errorNodesFirstWrong.length === 0){
+      errorRefWrong.current.hidden = true;
+    }else{
+      errorRefWrong.current.hidden = false;
+      errorRefWrong.current.textContent = "Check terminals of nodes (contains wrong elements): " + errorNodesFirstWrong.join(", ");
+    }
+
+    if(errorNodesFirstTooFew.length === 0){
+      errorRef.current.hidden = true;
+    }else{
+      errorRef.current.hidden = false;
+      errorRef.current.textContent = "Check terminals of nodes (too few elements): " + errorNodesFirstTooFew.join(", ");
+    }
+
+    if(errorNodesFirstTooMany.length === 0){
+      errorRefMany.current.hidden = true;
+    }else{
+      errorRefMany.current.hidden = false;
+      errorRefMany.current.textContent = "Check terminals of nodes (too many elements): " + errorNodesFirstTooMany.join(", ");
+    }
+    
+
+    console.log(correct);
+    if(correct) {
+      const totalEdges = [...dependencies.values()].slice(0,-1).reduce(function (acc, dependency) {
+        return acc + dependency.size;
+      }, 0);
+      console.log("Eigentlich nicht");
     if(totalEdges !== edges.length){
       correct = false;
+      errorRefMany.current.hidden = false;
+      if(totalEdges < edges.length){
+        errorRefMany.current.textContent = "Check dependencies of nodes (too many edges)";
+      }else{
+        errorRefMany.current.textContent = "Check dependencies of nodes (too few edges)";
+      }
     }else{
       correct = edges.every((edge) => {
         console.log(edge);
-        return dependencies.get(edge.target).has(edge.source) && dependencies.get(edge.target).delete(edge.source);
+        const correctEdge = dependencies.get(edge.target).has(edge.source);
+        if(!correctEdge){
+          errorRefMany.current.hidden = false;
+          errorRefMany.current.textContent = "Check dependencies of nodes (wrong edge): " + edge.source + " -> " + edge.target;
+        }
+        dependencies.get(edge.target).delete(edge.source);
+        return correctEdge;
       })
 
       /*edges.forEach((edge) => {
@@ -488,7 +557,7 @@ export default function DependencyGraph ({children, className, containerClassNam
         console.log(correct);
       })*/
     }
-
+  }
 
 
 
@@ -496,6 +565,8 @@ export default function DependencyGraph ({children, className, containerClassNam
       solvedCorrect = false;
     }
     setSolved(solvedCorrect);
+    console.log("Solved: " + solvedCorrect);
+    return solvedCorrect;
   }
 
   const setReactFlowInstanceInit = (reactFlowInstance) => {
@@ -512,7 +583,7 @@ export default function DependencyGraph ({children, className, containerClassNam
         id: symbol,
         type: 'dependencyNode',
         position,
-        data: { label: `${symbol}`, ref: textInputRef.current[index], active: false, index: index},
+        data: { label: `${symbol}`, ref: textInputRef.current[index], text: "", active: false, index: index, disabled: false, stepActive: false},
       };
 
       nodesInit = nodesInit.concat(newNode);
@@ -588,7 +659,7 @@ export default function DependencyGraph ({children, className, containerClassNam
                 <NullableTable classNameTable='border-2 border-solid rounded-lg border-color' className='w-full p-2' grammarObj={grammarObj} checkBoxRef={checkBoxRef} active={activeRow} editable={false}/>
               </div>
             </div>
-            <div className='w-2/3 border-2 border-solid rounded-lg border-color ml-2 h-9/10'>
+            <div className='w-2/3 border-2 border-solid rounded-r-lg border-color ml-2 h-9/10'>
                 <ReactFlowProvider>
                   <div className="reactflow-wrapper h-full" ref={reactFlowWrapper}>
                     <ReactFlow
@@ -602,9 +673,14 @@ export default function DependencyGraph ({children, className, containerClassNam
                       onDragOver={onDragOver}
                       onDragStart={onDragStart}
                       snapToGrid
-                      onEdgeUpdate={onEdgeUpdate}
+                      onEdgeUpdate={onEdgeUpdate }
                       onEdgeUpdateStart={onEdgeUpdateStart}
                       onEdgeUpdateEnd={onEdgeUpdateEnd}
+                      nodesDraggable={!solved}
+                      nodesConnectable={!solved}
+                      nodesFocusable={!solved}
+                      edgesUpdatable={!solved}
+                      zoomOnDoubleClick={!solved}
                       fitView
                       nodeTypes={nodeTypes}
                       edgeTypes={edgeTypes}
@@ -615,16 +691,16 @@ export default function DependencyGraph ({children, className, containerClassNam
                   </div>
                 </ReactFlowProvider>
                 <div className='h-1/10 items-center flex justify-center flex-col text-xs m-1'>
-                  <p ref={errorRef} className='text-red-500'>Mistake</p>
-                  <p ref={errorRef} className='text-red-500'>Mistake 2</p>
-                  <p ref={errorRef} className='text-red-500'>Mistake 3</p>
-                  <p ref={errorRef} className='text-red-500'>Mistake 4</p>
+                  <p ref={errorRefEmpty} className='text-red-500' hidden={true}>Mistake</p>
+                  <p ref={errorRefWrong} className='text-red-500' hidden={true}>Mistake 2</p>
+                  <p ref={errorRefMany} className='text-red-500' hidden={true}>Mistake 3</p>
+                  <p ref={errorRef} className='text-red-500' hidden={true}>Mistake 4</p>
                 </div>
               {//<AddNodes/>
               }
             </div>
          </div>
-         <div>
+         <div className='mt-2'>
             <Button variant="contained" sx={{ mt: 3, ml: 1 }} onClick={handleBack}>
             Back
             </Button>
@@ -632,7 +708,7 @@ export default function DependencyGraph ({children, className, containerClassNam
                 {stepState!==4 ? (stepStateRunning ? 'Running...' : 'Next Step') : 'Restart'}
             </Button> 
             
-            <Button variant="contained" sx={{ mt: 3, ml: 1 }} onClick={handleCheck}>
+            <Button className={solved && "opacity-50"} variant="contained" sx={{ mt: 3, ml: 1 }} onClick={handleCheck} disabled={solved}>
             Check
             </Button>
             {solved

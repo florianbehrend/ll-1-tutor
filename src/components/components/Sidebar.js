@@ -6,7 +6,7 @@ import '../layout/Sidebar.css';
 
 
 // Step titles
-const labels = ["Enter grammar",  "Nullable-Set", "Generate Dependency-Graph", "Generate First-Set", "Generate Follow-Set", "Generate Look-Up-Table", "Check if grammar is LL(1)", "LL(1) Parser Step-by-Step"];
+const labels = ["Enter grammar",  "Empty-Attribute", "Generate Dependency-Graph", "Generate First-Set", "Generate Follow-Set", "Generate Look-Up-Table", "LL(1) Parser Step-by-Step"];
 
 
 export default function Sidebar ({className}) {
