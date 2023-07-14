@@ -1,15 +1,18 @@
 import { StepperProvider } from "../context/StepperContext";
 import '../layout/Tutor.css';
-import React, { useContext, useState } from "react";
+import React from "react";
 import TutorStepPage from "./TutorStep";
 import { StoredProvider } from "../context/StoredContext";
 
-export default function TutorPage () {
+// TutorPage component
+const TutorPage = () => {
     return (
         <StepperProvider>
             <StoredProvider>
-                <TutorStepPage/>
+                <TutorStepPage />
             </StoredProvider>
         </StepperProvider>
     )
 }
+
+export default TutorPage;
