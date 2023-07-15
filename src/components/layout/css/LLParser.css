@@ -1,16 +1,16 @@
-.rd3t-label__title{
+.rd3t-label__title {
     fill: #fef08a !important;
 }
 
-.rd3t-node{
+.rd3t-node {
     fill: #fef08a !important;
     stroke: #2f2f2f !important;
 }
 
-.rd3t-leaf-node{
+.rd3t-leaf-node {
     stroke: white !important;
 }
 
-.rd3t-link{
+.rd3t-link {
     stroke: white !important;
 }

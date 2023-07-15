@@ -8,7 +8,6 @@
 
 .neumophism-shadow{
     border-radius: 20px;
-    /* background: #18181b; */
     box-shadow:  3px 3px 5px #131315,
                 -3px -3px 5px #1d1d21;
     border-color: #2f2f2f;
@@ -18,4 +17,8 @@
 
 .m-container{
     margin: 0.5rem 0.5rem 0.5rem 1.5rem !important; 
+}
+
+.max-w-15{
+    max-width: 15%;
 }

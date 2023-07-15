@@ -1,5 +1,5 @@
 import { StepperProvider } from "../context/StepperContext";
-import '../layout/Tutor.css';
+import '../layout/css/Tutor.css';
 import React from "react";
 import TutorStepPage from "./TutorStep";
 import { StoredProvider } from "../context/StoredContext";

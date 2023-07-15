@@ -34,7 +34,7 @@ function DependencyNode({ data, isConnectable }) {
 
   return (
     <StoredContext.Consumer>
-      {() => (<div className={"dependency-node flex justify-center items-center overflow-hidden" + (data.active ? " dependency-node-active" : "") + (data.stepActive ? " dependency-node-stepactive" : "")} onClick={clickHandler}>
+      {() => (<div className={"dependency-node flex justify-center items-center overflow-hidden" + (data.active ? " dependency-node-active" : "") + (data.stepActive ? " dependency-node-stepactive" : "") + (data.stepDone ? " dependency-node-stepdone" : "")} onClick={clickHandler}>
         <div id="text" name="text" className="flex flex-col justify-center items-center">
           <label className='dependency-label' htmlFor="text" style={{ fontSize: setSize(data.label) + 'px' }}>{data.label}</label>
           <input className='max-w-3 focus:outline-none' type="text" rows={1} ref={data.ref} />

@@ -1,7 +1,7 @@
 import Sidebar from "../components/Sidebar"
-import Content from "../layout/Content"
-import Header from "../layout/Header";
-import '../layout/Tutor.css';
+import Content from "../layout/js/Content"
+import Header from "../layout/js/Header";
+import '../layout/css/Tutor.css';
 import React, { useContext } from "react";
 import { StepperContext } from "../context/StepperContext";
 import EnterGrammar from "../pages/EnterGrammar";
