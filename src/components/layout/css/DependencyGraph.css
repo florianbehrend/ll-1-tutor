@@ -17,6 +17,10 @@
   fill: #fef08a;
 }
 
+.react-flow__controls-interactive{
+  visibility: collapse;
+}
+
 .dependency-node {
   height: 50px;
   width: 70px;

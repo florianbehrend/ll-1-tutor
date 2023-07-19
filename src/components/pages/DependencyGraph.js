@@ -1,87 +1,98 @@
-import React, {useContext, useRef, useState, useCallback, useEffect, createRef}  from 'react';
+import React, { useContext, useRef, useState, useCallback, useEffect, createRef } from 'react';
 import Button from "../components/Button";
 import { StepperContext } from "../context/StepperContext";
-import {StoredContext} from '../context/StoredContext';
-import ReactFlow, { Controls, MarkerType, ReactFlowProvider, addEdge, useNodesState, useEdgesState, updateEdge} from 'reactflow';
+import { StoredContext } from '../context/StoredContext';
+import ReactFlow, { Controls, MarkerType, ReactFlowProvider, addEdge, useNodesState, useEdgesState, updateEdge } from 'reactflow';
 import 'reactflow/dist/style.css';
-import '../layout/DependencyGraph.css';
-import AddNodes from '../components/AddNodes';
+import '../layout/css/DependencyGraph.css';
 import DependencyNode from '../components/DependencyNode';
 import dagre from 'dagre';
 import NullableTable from '../components/NullableTable';
-import {highlightProduction, removeHighlight, removeHighlightAll, stopSteps} from '../utils/utils';
+import { highlightProduction, stopSteps } from '../utils/utils';
 
+// Initial state of the graph
 const initialNodes = [];
-
 const initialEdges = [];
 
+// Description of each step in the graph creation process
 const stepDesc = [
-  {'key': 0, 'msg': 'Create the Variable Dependency Graph for this grammar. Mark the nodes with a double click if they can be evaluated to epsilon. In addition, enter the terminal symbols in the text fields with which the nonterminals can start.'},
-  {'key': 1, 'msg': 'Step 1: Mark each node where the nonterminal can be empty.'},
-  {'key': 2, 'msg': 'Step 2: Add all the dependencies of the nonterminals. A nonterminal is dependent on other nonterminals if they come first on the right side of production.\nIf this nonterminal is empty, there may be another dependency on subsequent nonterminals.'},
-  {'key': 3, 'msg': 'Step 3: No new nullable nonterminals are found in step 2, the Nullable-Set contains all the nullable nonterminals in your grammar.'},
-  {'key': 4, 'msg': 'Done! All dependencies and start terminals have been specified.'},
+  { 'key': 0, 'msg': 'Create the Variable Dependency Graph for this grammar. \nMark the nodes with a double click if they can be evaluated to epsilon. \nIn addition, enter the terminal symbols in the text fields with which the nonterminals can start (use the following pattern: <terminal>, <terminal>, ...). \nAlso connect the nodes to show the dependencies of the nonterminals (A is dependent on B: B -> A).' },
+  { 'key': 1, 'msg': 'Mark each node where the nonterminal can be empty.' },
+  { 'key': 2, 'msg': 'Add all the dependencies of the nonterminals. A nonterminal is dependent on other nonterminals if they come first on the right side of production.\nIf this nonterminal is empty, there may be another dependency on subsequent nonterminals.' },
+  { 'key': 3, 'msg': 'Enter the terminal symbols in the text fields with which the nonterminals can start. Use the following pattern: <terminal>, <terminal>, ... ' },
+  { 'key': 4, 'msg': 'Done! All dependencies and start terminals have been specified.' },
 ]
 
-const nodeTypes = { dependencyNode: DependencyNode};
-const edgeTypes = { type: 'default'};
+// Node types for ReactFlow visualization
+const nodeTypes = { dependencyNode: DependencyNode };
+const edgeTypes = { type: 'default' };
 
 const timeOut = [];
 const modifiedList = [];
 
-//return for every production the dependency/first symbol and mark if it ist terminal/nonterminal
+/**
+ * Get the dependencies and labels of symbols in the right-hand side of a production.
+ * @param {object} grammarObj - The grammar object containing the grammar information.
+ * @param {Set} nullableSet - A Set containing nullable non-terminals.
+ * @param {Array} rhs - An array containing symbols on the right-hand side of a production.
+ * @returns {Array} An array containing objects representing the dependencies and labels of the symbols.
+ * Each object has two properties: 'symbol' (the symbol itself) and 'isNonTerminal' (a boolean indicating if it's a non-terminal).
+ */
 const getDependency = (grammarObj, nullableSet, rhs) => {
-  //console.log(rhs);
-  //stepStateRunning = true;
   const dependency = [];
   rhs.every((symbol) => {
-    if(grammarObj.terminals.includes(symbol)){
-      dependency.push({symbol: symbol, isNonTerminal: false});
+    if (grammarObj.terminals.includes(symbol)) {
+      dependency.push({ symbol: symbol, isNonTerminal: false });
       return false; //isNonTerminal
-    } else if(!nullableSet.has(symbol)){
-      dependency.push({symbol: symbol, isNonTerminal: true});
+    } else if (!nullableSet.has(symbol)) {
+      dependency.push({ symbol: symbol, isNonTerminal: true });
       return false; //isNonTerminal
-    }else {
-      dependency.push({symbol: symbol, isNonTerminal: true});
+    } else {
+      dependency.push({ symbol: symbol, isNonTerminal: true });
       return true;
     }
   });
   return dependency;
 }
 
+/**
+ * Get the dependencies and labels of non-terminals in the grammar.
+ * @param {object} grammarObj - The grammar object containing the grammar information.
+ * @param {Set} nullableSet - A Set containing nullable non-terminals.
+ * @returns {Array} An array containing two maps: 'dependencies' and 'label'.
+ * The 'dependencies' map stores the dependencies of non-terminals as a Map of Sets.
+ * The 'label' map stores the labels of non-terminals as a Map of Sets.
+ */
 const getDependencies = (grammarObj, nullableSet) => {
   const dependencies = new Map();
   const label = new Map();
-  grammarObj.productions.forEach(({lhs, rhs}) => {
-    if(!dependencies.has(lhs)){
+  grammarObj.productions.forEach(({ lhs, rhs }) => {
+    if (!dependencies.has(lhs)) {
       dependencies.set(lhs, new Set());
       label.set(lhs, new Set());
     }
     const depTemp = getDependency(grammarObj, nullableSet, rhs);
-    depTemp.forEach(({symbol, isNonTerminal}) => {
-      if(isNonTerminal){
+    depTemp.forEach(({ symbol, isNonTerminal }) => {
+      if (isNonTerminal) {
         dependencies.get(lhs).add(symbol);
-      }else{
-        if (symbol !== 'e' && symbol !== 'eps') {
+      } else {
+        if (symbol !== 'ε') {
           label.get(lhs).add(symbol);
         }
       }
     })
-    //console.log(dependencies);
-    //console.log(label);
   })
   return [dependencies, label];
 }
 
-export default function DependencyGraph ({children, className, containerClassName,  ...props}) {
+export default function DependencyGraph() {
 
-  const {activeStep, setActiveStep} = useContext(StepperContext);
-  const {grammar, setGrammar} = useContext(StoredContext);
-  const {grammarObj, setGrammarObj} = useContext(StoredContext);
-  const {nullableSet, setNullableSet} = useContext(StoredContext);
-  const {activeRow, setActiveRow} = useContext(StoredContext);
-  const {storedNodes, setStoredNodes} = useContext(StoredContext);
-  const {storedEdges, setStoredEdges} = useContext(StoredContext);
+  const { setActiveStep } = useContext(StepperContext);
+  const { grammarObj } = useContext(StoredContext);
+  const { nullableSet } = useContext(StoredContext);
+  const { activeRow, setActiveRow } = useContext(StoredContext);
+  const { setStoredNodes } = useContext(StoredContext);
+  const { setStoredEdges } = useContext(StoredContext);
 
   const [stepState, setStepState] = useState(0);
   const [solved, setSolved] = useState(false);
@@ -92,7 +103,7 @@ export default function DependencyGraph ({children, className, containerClassNam
 
   const checkBoxRef = useRef(grammarObj.nonTerminals.slice(1).map(() => createRef()));
   const textInputRef = useRef(grammarObj.nonTerminals.slice(1).map(() => createRef()));
-  const productionRef = useRef(grammarObj.productions.slice(0,-1).map(() => createRef()));
+  const productionRef = useRef(grammarObj.productions.slice(0, -1).map(() => createRef()));
   const textRef = useRef();
   const productionFieldRef = useRef();
   const edgeUpdateSuccessful = useRef(true);
@@ -101,35 +112,43 @@ export default function DependencyGraph ({children, className, containerClassNam
   const errorRefMany = useRef();
   const errorRefWrong = useRef();
 
-  let id = 0;
+
+    /**
+     * Utility function to generate unique node IDs
+     */  let id = 0;
   const getId = () => `node_${id++}`;
 
-  const handleNext = () => { 
-    
-    if(handleCheck()){
+
+    /**
+     * FunFunction to handle the "Next" button click
+     */  const handleNext = () => {
+    if (handleCheck()) {
       setActiveStep((prevActiveStep) => prevActiveStep + 1);
       nodes.forEach(node => {
         node.data.text = node.data.ref.current.value;
       });
       setStoredEdges(edges);
       setStoredNodes(nodes);
-    }   
+    }
   };
 
+  /**
+   * Function to handle the "Back" button click
+   */
   const handleBack = () => {
     setActiveStep((prevActiveStep) => prevActiveStep - 1);
     nullableSet.clear();
     setActiveRow([]);
   };
 
-  const productionList = [...grammar.split("\n")];
-
+  /**
+   * ReactFlow instance and its handlers for edge creation/update
+   */
   const reactFlowWrapper = useRef(null);
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
   const [reactFlowInstance, setReactFlowInstance] = useState(null);
 
-  //const onConnect = useCallback((params) => {setEdges((eds) => addEdge(params, eds));});
   const onConnect = (params) => setEdges((eds) => {
     var edge = {
       id: params.source + "-" + params.sourceHandle + "-" + params.target + "-" + params.targetHandle,
@@ -164,10 +183,10 @@ export default function DependencyGraph ({children, className, containerClassNam
     edgeUpdateSuccessful.current = true;
   }, []);
 
-  //TODO https://reactflow.dev/docs/examples/edges/custom-edge/
-  //https://reactflow.dev/docs/api/nodes/handle/
-  //https://reactflow.dev/docs/guides/custom-nodes/
 
+  /**
+   * Drag and drop handlers for nodes
+   */
   const onDragOver = useCallback((event) => {
     event.preventDefault();
     event.dataTransfer.dropEffect = 'move';
@@ -203,78 +222,82 @@ export default function DependencyGraph ({children, className, containerClassNam
 
   const onDragStart = (event, nodeType) => {
     event.dataTransfer.setData('application/reactflow', nodeType);
-    //event.dataTransfer.effectAllowed = 'move';
   };
 
+  /**
+  * Function to reset the graph and the step state.
+  */
   const reset = () => {
     setStepStateRunning(false);
     setStepState(0);
     stopSteps(productionRef, modifiedList, timeOut);
     setSolved(false);
-    //removeHighlight(productionRef, modifiedList);
     setEdges(initialEdges);
     textInputRef.current.forEach((textInput) => textInput.current.value = "");
     setNodes((nds) =>
-        nds.map((node) => {
-            // it's important that you create a new object here
-            // in order to notify react flow about the change
-            node.data = {
-              ...node.data,
-              active: false,
-            };
-            node.data.ref.current.classList.remove("dependency-label-false", "dependency-label-correct");
-          return node;
-        })
-      );
-    setActiveRow(activeRow.map(() => {return false}));
-    //removeHighlightAll(productionRef);
-    console.log(activeRow);
+      nds.map((node) => {
+        node.data = {
+          ...node.data,
+          active: false,
+        };
+        node.data.ref.current.classList.remove("dependency-label-false", "dependency-label-correct");
+        return node;
+      })
+    );
+    setActiveRow(activeRow.map(() => { return false }));
     setRefreshRow(-1);
   }
 
+  /**
+ * Handles the step-by-step execution of actions and animations related to a grammar.
+ */
   const handleStep = () => {
-    //console.log(stepState);
-    //TODO remove everything from checked (error message and color)
     setStepStateRunning(true);
-    if(stepState <= 4) {setStepState(stepState+1)};
     var counter = 0;
-    //const [dependencies, label] = getDependencies(grammarObj, nullableSet);
     stopSteps(productionRef, modifiedList, timeOut);
 
     switch (stepState) {
       case 0:
+        // Perform actions for step 0.
+        setStepState(stepState + 1);
+        setStepStateRunning(false);
+        // Disable nodes.
+        nodes.forEach((node) => {
+          if (node.data.ref.current !== null) {
+            node.data.ref.current.disabled = true;
+            node.data.disabled = true;
+          }
+        });
+        break;
+      case 1:
+        // Highlight specific rows in the table based on the 'nullableSet'.
         grammarObj.nonTerminals.slice(1).forEach((symbol, index) => {
-          if(nullableSet.has(symbol)){
+          if (nullableSet.has(symbol)) {
             highlightRow(index, counter);
             counter++;
           }
-          //console.log(index);
         });
-        timeOut.push(setTimeout(() => {setStepStateRunning(false);}, counter * 1000));
+        timeOut.push(setTimeout(() => { setStepStateRunning(false); setStepState(stepState + 1); }, counter * 1000));
         break;
-      case 1:
-        //setStepState(stepState+1);
+      case 2:
+        // Initialize 'activeRow' to mark non-terminals as active or inactive.
         setActiveRow(grammarObj.nonTerminals.slice(1).map(() => false));
         var highlighted = false;
 
         grammarObj.productions.slice(0, -1).forEach((prod, index) => {
           prod.rhs.every((symbol) => {
-            if(grammarObj.terminals.includes(symbol)){
-              //dependency.push({symbol: symbol, isNonTerminal: false});
-              //highlightProduction(productionRef.current[index], counter, index, productionFieldRef);
-              //counter++;
+            if (grammarObj.terminals.includes(symbol)) {
               return false; //isNonTerminal
-            } else if(!nullableSet.has(symbol)){
-              //dependency.push({symbol: symbol, isNonTerminal: true});
+            } else if (!nullableSet.has(symbol)) {
+              // Handle non-nullable symbols.
               highlightProduction(productionRef.current[index], counter, index, productionFieldRef, timeOut);
               highlighted = true;
               timeOut.push(setTimeout(() => {
                 addEdgeToGraph(prod.lhs, symbol);
               }, counter * 1000));
-              
+
               return false; //isNonTerminal
-            }else {
-              //dependency.push({symbol: symbol, isNonTerminal: true});
+            } else {
               highlightProduction(productionRef.current[index], counter, index, productionFieldRef, timeOut);
               highlighted = true;
               timeOut.push(setTimeout(() => {
@@ -283,66 +306,63 @@ export default function DependencyGraph ({children, className, containerClassNam
               return true;
             }
           });
-          if(highlighted){counter++; modifiedList.push(index);};
+          if (highlighted) { counter++; modifiedList.push(index); };
           highlighted = false;
         });
-        timeOut.push(setTimeout(() => {setStepStateRunning(false); setRefresh(!refresh)}, counter * 1000));
-        
+
+        timeOut.push(setTimeout(() => { setStepStateRunning(false); setRefresh(!refresh); setStepState(stepState + 1); }, counter * 1000));
+
         break;
-      case 2:
-        //console.log(productionFieldRef);
+      case 3:
         setActiveRow(grammarObj.nonTerminals.slice(1).map(() => false));
         const tempNonterminals = [...grammarObj.nonTerminals];
         var highlighted = false;
+
         grammarObj.productions.slice(0, -1).forEach((prod, index) => {
-          const inputIndex = tempNonterminals.indexOf(prod.lhs)-1;
+          const inputIndex = tempNonterminals.indexOf(prod.lhs) - 1;
 
           prod.rhs.every((symbol) => {
-            if(grammarObj.terminals.includes(symbol)){
-              //dependency.push({symbol: symbol, isNonTerminal: false});
-              if(symbol !== 'e' && symbol !== 'eps'){
-                //counter++;
+            if (grammarObj.terminals.includes(symbol)) {
+              if (symbol !== 'ε') {
                 highlightProduction(productionRef.current[index], counter, index, productionFieldRef, timeOut);
                 highlighted = true;
-                timeOut.push(setTimeout(() => {textInputRef.current[inputIndex].current.value = textInputRef.current[inputIndex].current.value === "" ? symbol : textInputRef.current[inputIndex].current.value + ", " + symbol}, counter * 1000));
+                timeOut.push(setTimeout(() => { textInputRef.current[inputIndex].current.value = textInputRef.current[inputIndex].current.value === "" ? symbol : textInputRef.current[inputIndex].current.value + ", " + symbol }, counter * 1000));
               }
               return false; //isNonTerminal
-            } else if(!nullableSet.has(symbol)){
-              //dependency.push({symbol: symbol, isNonTerminal: true});
+            } else if (!nullableSet.has(symbol)) {
               return false; //isNonTerminal
-            }else {
-              //dependency.push({symbol: symbol, isNonTerminal: true});
+            } else {
               highlightProduction(productionRef.current[index], counter, index, productionFieldRef, timeOut);
               highlighted = true;
-              //counter++;
               return true;
             }
           });
-          if(highlighted){counter++; modifiedList.push(index);};
+          if (highlighted) { counter++; modifiedList.push(index); };
           highlighted = false;
         });
-        timeOut.push(setTimeout(() => {setStepStateRunning(false); setRefresh(!refresh)}, counter * 1000));
+
+        timeOut.push(setTimeout(() => { setStepStateRunning(false); setRefresh(!refresh); setStepState(stepState + 1); handleCheck(); }, counter * 1000));
+
         break;
       default:
         reset();
         break;
     }
-    
-    
-    //console.log(textRef.current);
-    //setEdges([]);
-    //setNodes(createGraphLayout(nodes, edges));
-    //reactFlowInstance.fitView();
+
   }
 
+  /**
+ * Asynchronously highlights a row in a table.
+ *
+ * @param {number} index - The index of the row to be highlighted.
+ * @param {number} counter - A counter to control the delay of the highlighting effect.
+ */
   async function highlightRow(index, counter) {
-    timeOut.push(setTimeout(() => {activeRow[index] = true;
-      //nodes[index].data.active = true;
+    timeOut.push(setTimeout(() => {
+      activeRow[index] = true;
       setNodes((nds) =>
         nds.map((node) => {
           if (node.data.index === index) {
-            // it's important that you create a new object here
-            // in order to notify react flow about the change
             node.data = {
               ...node.data,
               active: true,
@@ -356,6 +376,11 @@ export default function DependencyGraph ({children, className, containerClassNam
     }, counter * 1000));
   }
 
+  /**
+ * Function to add an edge to the dependency graph.
+ * @param {string} target - The id of the target node where the edge connects.
+ * @param {string} key - The id of the source node from where the edge originates.
+ */
   const addEdgeToGraph = (target, key) => {
     const edge = {
       id: `${key}-${target}`,
@@ -373,11 +398,12 @@ export default function DependencyGraph ({children, className, containerClassNam
     setEdges((eds) => addEdge(edge, eds));
   }
 
+  /**
+   * function to handle the "Solve" button click.
+   */
   const handleSolved = () => {
     reset();
     setStepStateRunning(false);
-    //stopSteps(productionRef, modifiedList);
-    //console.log(nullableSet);
     setStepState(4);
     setSolved(true);
 
@@ -386,220 +412,204 @@ export default function DependencyGraph ({children, className, containerClassNam
     errorRefMany.current.hidden = true;
     errorRefWrong.current.hidden = true;
 
-
     setEdges(initialEdges);
 
     const [dependencies, label] = getDependencies(grammarObj, nullableSet);
     dependencies.forEach((value, key) => {
-      if(key !== grammarObj.startSymbol){
+      if (key !== grammarObj.startSymbol) {
         value.forEach((target) => {
           addEdgeToGraph(key, target);
         });
       }
     });
     setNodes((nds) =>
-        nds.map((node, index) => {
-          if(label.get(node.id).size >= 1){
-            textInputRef.current[index].current.value = [...label.get(node.id)].join(', ');
-          }else {
-            textInputRef.current[index].current.value = '';
-          }
-          if(nullableSet.has(node.id)){
-            node.data = {
-              ...node.data,
-              active: true,
-            };
+      nds.map((node, index) => {
+        if (label.get(node.id).size >= 1) {
+          textInputRef.current[index].current.value = [...label.get(node.id)].join(', ');
+        } else {
+          textInputRef.current[index].current.value = '';
+        }
+        if (nullableSet.has(node.id)) {
+          node.data = {
+            ...node.data,
+            active: true,
           };
-          return node;
-        })
-      );
-    /*nodes.forEach((node, index) => {
-     
-    });*/
+        };
+        return node;
+      })
+    );
     setRefresh(!refresh);
   };
 
+  //auto align nodes when refresh changes
   useEffect(() => {
     setNodes(createGraphLayout(nodes, edges));
     setRefreshLayout(!refreshLayout);
   }, [refresh]);
 
+  //auto fit view when refreshLayout changes
   useEffect(() => {
-    if(reactFlowInstance !== null){
+    if (reactFlowInstance !== null) {
       reactFlowInstance.fitView()
     };
   }, [refreshLayout]);
 
-  //TODO Löschen von Nodes verhindern
-
+  /**
+  * Function to check the correctness of user inputs.
+  * @returns {boolean} True if all inputs are correct, otherwise false.
+  */
   const handleCheck = () => {
-    //setNodes(createGraphLayout(nodes, edges));
-    //reactFlowInstance.fitView();
     const [dependencies, label] = getDependencies(grammarObj, nullableSet);
+
     var solvedCorrect = true;
     var correct = true;
+
     const errorNodesEmpty = [];
     const errorNodesFirstTooMany = [];
     const errorNodesFirstTooFew = [];
     const errorNodesFirstWrong = [];
 
+    // Iterate over each non-terminal node in the graph to validate the user inputs
     grammarObj.nonTerminals.slice(1).forEach((symbol, index) => {
       nodes[index].data.ref.current.classList.remove("dependency-label-false", "dependency-label-correct");
-      //console.log(nodes[index].data.active);
-      //when field is empty
-      if(label.get(symbol).size === 0){
-        //label.get(symbol).add("");
-      }
+
+      // Retrieve the user input for the current non-terminal node
       const userInput = textInputRef.current[index].current.value.split(", ").map((symbol) => symbol.trim()).filter((symbol) => symbol !== "");
+      // Find the difference between the expected labels and the user input for the current non-terminal
       const difference = new Set([...label.get(symbol)].filter(x => !userInput.includes(x)));
-      
-      console.log(label.get(symbol));
-      console.log(userInput);
-      console.log(difference);
+
+      // Check if the number of labels for the current non-terminal node matches the user input
       if (label.get(symbol).size > userInput.length) {
-        //correctTemp[nonTerminal].helpertext = "too few elements";
         setSolved(false);
         nodes[index].data.ref.current.classList.add("dependency-label-false");
         errorNodesFirstTooFew.push(symbol);
-        console.log("Häää");
         correct = false;
-      } else if(label.get(symbol).size < userInput.length){
-        //correctTemp[nonTerminal].helpertext = "too many elements";
+      } else if (label.get(symbol).size < userInput.length) {
         setSolved(false);
         nodes[index].data.ref.current.classList.add("dependency-label-false");
         errorNodesFirstTooMany.push(symbol);
-        console.log("too many");
         correct = false;
       } else {
-        //Bicondition to check nullable marker
+        // Check if the nullable marker matches the user's selection
         if (!(nullableSet.has(symbol) === nodes[index].data.active)) {
           errorNodesEmpty.push(symbol);
-          console.log("Empty missing");
         }
-        if(difference.size === 0){
+        if (difference.size === 0) {
           nodes[index].data.ref.current.classList.add("dependency-label-correct");
-        }else{
+        } else {
           nodes[index].data.ref.current.classList.add("dependency-label-false");
           errorNodesFirstWrong.push(symbol);
           correct = false;
         }
-        console.log("correct");
       }
 
-      //Check Text vier teilen - NUllable fehlt / Input zu kurz / Input zu lang / Kanten zu wenig/ viel
-
-
-      //correctTemp[nonTerminal].error = !correct;
-      //correctTemp[nonTerminal].correct = correct;
-      
-      //console.log(correctTemp);
     })
 
-    if(errorNodesEmpty.length === 0){
+    // Update error messages based on validation results
+    if (errorNodesEmpty.length === 0) {
       errorRefEmpty.current.hidden = true;
-    }else{
+    } else {
       errorRefEmpty.current.hidden = false;
       errorRefEmpty.current.textContent = "Check following nodes if you marked them as empty: " + errorNodesEmpty.join(", ");
     }
 
-    if(errorNodesFirstWrong.length === 0){
+    if (errorNodesFirstWrong.length === 0) {
       errorRefWrong.current.hidden = true;
-    }else{
+    } else {
       errorRefWrong.current.hidden = false;
       errorRefWrong.current.textContent = "Check terminals of nodes (contains wrong elements): " + errorNodesFirstWrong.join(", ");
     }
 
-    if(errorNodesFirstTooFew.length === 0){
+    if (errorNodesFirstTooFew.length === 0) {
       errorRef.current.hidden = true;
-    }else{
+    } else {
       errorRef.current.hidden = false;
       errorRef.current.textContent = "Check terminals of nodes (too few elements): " + errorNodesFirstTooFew.join(", ");
     }
 
-    if(errorNodesFirstTooMany.length === 0){
+    if (errorNodesFirstTooMany.length === 0) {
       errorRefMany.current.hidden = true;
-    }else{
+    } else {
       errorRefMany.current.hidden = false;
       errorRefMany.current.textContent = "Check terminals of nodes (too many elements): " + errorNodesFirstTooMany.join(", ");
     }
-    
 
-    console.log(correct);
-    if(correct) {
-      const totalEdges = [...dependencies.values()].slice(0,-1).reduce(function (acc, dependency) {
+    // Check the correctness of the dependencies between nodes
+    if (correct) {
+      const totalEdges = [...dependencies.values()].slice(0, -1).reduce(function (acc, dependency) {
         return acc + dependency.size;
       }, 0);
-      console.log("Eigentlich nicht");
-    if(totalEdges !== edges.length){
-      correct = false;
-      errorRefMany.current.hidden = false;
-      if(totalEdges < edges.length){
-        errorRefMany.current.textContent = "Check dependencies of nodes (too many edges)";
-      }else{
-        errorRefMany.current.textContent = "Check dependencies of nodes (too few edges)";
-      }
-    }else{
-      correct = edges.every((edge) => {
-        console.log(edge);
-        const correctEdge = dependencies.get(edge.target).has(edge.source);
-        if(!correctEdge){
-          errorRefMany.current.hidden = false;
-          errorRefMany.current.textContent = "Check dependencies of nodes (wrong edge): " + edge.source + " -> " + edge.target;
+      if (totalEdges !== edges.length) {
+        correct = false;
+        errorRefMany.current.hidden = false;
+        if (totalEdges < edges.length) {
+          errorRefMany.current.textContent = "Check dependencies of nodes (too many edges)";
+        } else {
+          errorRefMany.current.textContent = "Check dependencies of nodes (too few edges)";
         }
-        dependencies.get(edge.target).delete(edge.source);
-        return correctEdge;
-      })
+      } else {
+        correct = edges.every((edge) => {
+          const correctEdge = dependencies.get(edge.target).has(edge.source);
+          if (!correctEdge) {
+            errorRefMany.current.hidden = false;
+            errorRefMany.current.textContent = "Check dependencies of nodes (wrong edge): " + edge.source + " -> " + edge.target;
+          }
+          dependencies.get(edge.target).delete(edge.source);
+          return correctEdge;
+        })
 
-      /*edges.forEach((edge) => {
-        console.log(edge);
-        correct = dependencies.get(edge.target).has(edge.source);
-        dependencies.get(edge.target).delete(edge.source);
-        console.log(correct);
-      })*/
+      }
     }
-  }
-
-
-
+    // Set the overall correctness state of the graph creation process
     if (!correct) {
       solvedCorrect = false;
+    } else {
+      setStepState(4);
     }
     setSolved(solvedCorrect);
-    console.log("Solved: " + solvedCorrect);
     return solvedCorrect;
   }
 
+  /**
+  * ReactFlow instance initialization function.
+  * @param {object} reactFlowInstance - The ReactFlow instance object
+  */
   const setReactFlowInstanceInit = (reactFlowInstance) => {
     let x = 10;
     let y = 10;
     let nodesInit = initialNodes;
-     setReactFlowInstance(reactFlowInstance);
-     grammarObj.nonTerminals.slice(1).forEach((symbol, index) => {
+    setReactFlowInstance(reactFlowInstance);
+    grammarObj.nonTerminals.slice(1).forEach((symbol, index) => {
       const position = {
-        x: x+=50,
+        x: x += 50,
         y: y,
       };
       const newNode = {
         id: symbol,
         type: 'dependencyNode',
         position,
-        data: { label: `${symbol}`, ref: textInputRef.current[index], text: "", active: false, index: index, disabled: false, stepActive: false},
+        data: { label: `${symbol}`, ref: textInputRef.current[index], text: "", active: false, index: index, disabled: false, stepActive: false },
       };
 
       nodesInit = nodesInit.concat(newNode);
     });
     setNodes(nodesInit);
-    //console.log(createGraphLayout(nodesInit));
     setNodes(createGraphLayout(nodesInit, edges));
   };
 
+  /**
+   * Function to create the graph layout using dagre library.
+   * @param {Array} flowNodeStates - Array of nodes in the graph
+   * @param {Array} flowEdgeStates - Array of edges in the graph
+   * @returns {Array} Array of nodes with their positions for visualization
+   */
   const createGraphLayout = (flowNodeStates, flowEdgeStates) => {
     const g = new dagre.graphlib.Graph();
-    g.setGraph({nodesep: 25, align: 'DL', rankdir: 'RL' });
-  
+    g.setGraph({ nodesep: 25, align: 'DL', rankdir: 'RL' });
+
     // Default to assigning a new object as a label for each new edge.
     g.setDefaultEdgeLabel(() => ({}));
-  
+
     flowNodeStates.forEach((node) => {
       g.setNode(node.id, {
         label: node.id,
@@ -612,15 +622,10 @@ export default function DependencyGraph ({children, className, containerClassNam
       g.setEdge(edge.source, edge.target);
     });
 
-    console.log(g);
-  
     dagre.layout(g);
 
-    console.log(g);
-  
     return flowNodeStates.map((nodeState) => {
       const node = g.node(nodeState.id);
-      console.log(nodeState);
       return {
         ...nodeState,
         position: {
@@ -633,89 +638,88 @@ export default function DependencyGraph ({children, className, containerClassNam
     });
   };
 
+  //set checkboxes after rendering
   useEffect(() => {
     grammarObj.nonTerminals.slice(1).forEach((item, index) => {
-      if(nullableSet.has(item)){
-          checkBoxRef.current[index].current.checked = true;
+      if (nullableSet.has(item)) {
+        checkBoxRef.current[index].current.checked = true;
       }
-  });
+    });
   })
-
- 
 
   return (
     <div className='flex flex-col w-full h-full'>
-        <div className='border-2 border-solid rounded-lg border-color mb-1 p-2'> 
-            <p ref={textRef} className='whitespace-pre-line'>{stepDesc[stepState].msg}</p>
+      <div className='border-2 border-solid rounded-lg border-color mb-1 p-2'>
+        <p ref={textRef} className='whitespace-pre-line'>{stepDesc[stepState].msg}</p>
+      </div>
+      <div className='flex h-full'>
+        <div className='w-1/3'>
+          <div className='w-full h-1/2 border-2 border-solid rounded-lg border-color p-2 text-left overflow-scroll' ref={productionFieldRef}>
+            {grammarObj.productions.slice(0, -1).map((item, index) => (
+              <p key={item.lhs + item.rhs} ref={productionRef.current[index]}>{item.lhs + " -> " + item.rhs.join(" ")}</p>
+            ))}
+          </div>
+          <div className='h-1/2 pt-1 overflow-y-scroll'>
+            <NullableTable classNameContainer='border-2 border-solid rounded-lg border-color' classNameTable='w-full p-2' grammarObj={grammarObj} checkBoxRef={checkBoxRef} active={activeRow} editable={false} />
+          </div>
         </div>
-         <div className='flex h-full'>
-            <div className='w-1/3'>
-              <div className='w-full h-1/2 border-2 border-solid rounded-lg border-color p-2 text-left overflow-scroll' ref={productionFieldRef}>
-                  {grammarObj.productions.slice(0, -1).map((item, index) => (
-                        <p key={item.lhs + item.rhs} ref={productionRef.current[index]}>{item.lhs + " -> " + item.rhs.join(" ")}</p>
-                    ))}
-              </div>
-              <div className='h-1/2 pt-1 overflow-y-scroll'>
-                <NullableTable classNameTable='border-2 border-solid rounded-lg border-color' className='w-full p-2' grammarObj={grammarObj} checkBoxRef={checkBoxRef} active={activeRow} editable={false}/>
-              </div>
+        <div className='w-2/3 border-2 border-solid rounded-r-lg border-color ml-2 h-9/10'>
+          <ReactFlowProvider>
+            <div className="reactflow-wrapper h-full" ref={reactFlowWrapper}>
+              <ReactFlow
+                nodes={nodes}
+                edges={edges}
+                onNodesChange={onNodesChange}
+                onEdgesChange={onEdgesChange}
+                onConnect={onConnect}
+                onInit={setReactFlowInstanceInit}
+                onDrop={onDrop}
+                onDragOver={onDragOver}
+                onDragStart={onDragStart}
+                snapToGrid
+                onEdgeUpdate={onEdgeUpdate}
+                onEdgeUpdateStart={onEdgeUpdateStart}
+                onEdgeUpdateEnd={onEdgeUpdateEnd}
+                nodesDraggable={!solved && stepState === 0}
+                nodesConnectable={!solved && stepState === 0}
+                nodesFocusable={!solved && stepState === 0}
+                edgesUpdatable={!solved && stepState === 0}
+                zoomOnDoubleClick={!solved && stepState === 0}
+                fitView
+                nodeTypes={nodeTypes}
+                edgeTypes={edgeTypes}
+                deleteKeyCode={null}
+              >
+                <Controls />
+              </ReactFlow>
             </div>
-            <div className='w-2/3 border-2 border-solid rounded-r-lg border-color ml-2 h-9/10'>
-                <ReactFlowProvider>
-                  <div className="reactflow-wrapper h-full" ref={reactFlowWrapper}>
-                    <ReactFlow
-                      nodes={nodes}
-                      edges={edges}
-                      onNodesChange={onNodesChange}
-                      onEdgesChange={onEdgesChange}
-                      onConnect={onConnect}
-                      onInit={setReactFlowInstanceInit}
-                      onDrop={onDrop}
-                      onDragOver={onDragOver}
-                      onDragStart={onDragStart}
-                      snapToGrid
-                      onEdgeUpdate={onEdgeUpdate }
-                      onEdgeUpdateStart={onEdgeUpdateStart}
-                      onEdgeUpdateEnd={onEdgeUpdateEnd}
-                      nodesDraggable={!solved}
-                      nodesConnectable={!solved}
-                      nodesFocusable={!solved}
-                      edgesUpdatable={!solved}
-                      zoomOnDoubleClick={!solved}
-                      fitView
-                      nodeTypes={nodeTypes}
-                      edgeTypes={edgeTypes}
-                      deleteKeyCode={null}
-                    >
-                      <Controls />
-                    </ReactFlow>
-                  </div>
-                </ReactFlowProvider>
-                <div className='h-1/10 items-center flex justify-center flex-col text-xs m-1'>
-                  <p ref={errorRefEmpty} className='text-red-500' hidden={true}>Mistake</p>
-                  <p ref={errorRefWrong} className='text-red-500' hidden={true}>Mistake 2</p>
-                  <p ref={errorRefMany} className='text-red-500' hidden={true}>Mistake 3</p>
-                  <p ref={errorRef} className='text-red-500' hidden={true}>Mistake 4</p>
-                </div>
-              {//<AddNodes/>
-              }
-            </div>
-         </div>
-         <div className='mt-2'>
-            <Button variant="contained" sx={{ mt: 3, ml: 1 }} onClick={handleBack}>
-            Back
-            </Button>
-            <Button variant="contained" sx={{ mt: 3, ml: 1 }} onClick={handleStep} disabled={stepStateRunning}>
-                {stepState!==4 ? (stepStateRunning ? 'Running...' : 'Next Step') : 'Restart'}
-            </Button> 
-            
-            <Button className={solved && "opacity-50"} variant="contained" sx={{ mt: 3, ml: 1 }} onClick={handleCheck} disabled={solved}>
-            Check
-            </Button>
-            {solved
-            ? <Button onClick={handleNext}>Next</Button>
-            : <Button onClick={handleSolved}>Solve</Button>     
-            }
+          </ReactFlowProvider>
+          <div className='h-1/10 items-center flex justify-center flex-col text-xs m-1'>
+            <p ref={errorRefEmpty} className='text-red-500' hidden={true}>Mistake</p>
+            <p ref={errorRefWrong} className='text-red-500' hidden={true}>Mistake 2</p>
+            <p ref={errorRefMany} className='text-red-500' hidden={true}>Mistake 3</p>
+            <p ref={errorRef} className='text-red-500' hidden={true}>Mistake 4</p>
+          </div>
+          {//<AddNodes/>
+          }
         </div>
+      </div>
+      <div className='mt-2'>
+        <Button variant="contained" sx={{ mt: 3, ml: 1 }} onClick={handleBack}>
+          Back
+        </Button>
+        <Button variant="contained" sx={{ mt: 3, ml: 1 }} onClick={handleStep} disabled={stepStateRunning}>
+          {stepState !== 4 ? (stepStateRunning ? 'Running...' : stepState === 0 ? 'Start Step-by-Step' : 'Next Step') : 'Restart'}
+        </Button>
+
+        <Button className={stepState !== 0 && "opacity-50"} variant="contained" sx={{ mt: 3, ml: 1 }} onClick={handleCheck} disabled={stepState !== 0}>
+          Check
+        </Button>
+        {solved
+          ? <Button onClick={handleNext}>Next</Button>
+          : <Button onClick={handleSolved}>Solve</Button>
+        }
+      </div>
     </div>
   )
 }

@@ -21,6 +21,7 @@
 .Mui-disabled{
   --tw-text-opacity: 1;
   color: rgb(254 240 138 / var(--tw-text-opacity)) !important;
+  -webkit-text-fill-color: rgb(254 240 138 / var(--tw-text-opacity)) !important;
 }
 
 .Mui-active{

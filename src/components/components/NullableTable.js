@@ -26,7 +26,7 @@ const NullableTable = ({ classNameTable, classNameContainer, grammarObj, checkBo
                     {grammarObj.nonTerminals.slice(1).map((item, index) => (
                         <tr className={"border-b  " + (activeRow[index] ? "step-active bg-sky-500" : "bg-zinc-800")} key={index}>
                             <td className='max-h-6 flex justify-center border-r'><p>{item}</p></td>
-                            <td className='max-h-6'><CheckBox inputRef={checkBoxRef.current[index]} onClick={editable ? checkedChange : (evt) => { evt.preventDefault() }} /></td>
+                            <td className='max-h-6'><CheckBox inputRef={checkBoxRef.current[index]} onClick={editable ? checkedChange : (evt) => { evt.preventDefault() }} accessKey={item}/></td>
                         </tr>
                     ))}
                 </tbody>

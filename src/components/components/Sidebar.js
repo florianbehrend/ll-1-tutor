@@ -11,7 +11,7 @@ const labels = [
   "Generate Dependency-Graph",
   "Generate First-Set",
   "Generate Follow-Set",
-  "Generate Look-Up-Table",
+  "Generate Lookahead-Table",
   "LL(1) Parser Step-by-Step"
 ];
 
