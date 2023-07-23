@@ -113,15 +113,16 @@ export default function DependencyGraph() {
   const errorRefWrong = useRef();
 
 
-    /**
-     * Utility function to generate unique node IDs
-     */  let id = 0;
+  /**
+  * Utility function to generate unique node IDs
+  */  let id = 0;
   const getId = () => `node_${id++}`;
 
 
-    /**
-     * FunFunction to handle the "Next" button click
-     */  const handleNext = () => {
+  /**
+   * FunFunction to handle the "Next" button click
+   */
+  const handleNext = () => {
     if (handleCheck()) {
       setActiveStep((prevActiveStep) => prevActiveStep + 1);
       nodes.forEach(node => {
