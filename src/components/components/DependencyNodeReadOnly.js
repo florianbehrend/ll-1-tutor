@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { Handle, Position } from 'reactflow';
 import { StoredContext } from '../context/StoredContext';
 import '../layout/css/DependencyNode.css';
@@ -10,7 +9,6 @@ import '../layout/css/DependencyNode.css';
  * @returns {React.JSX.Element} - The JSX element representing the DependencyNode.
  */
 function DependencyNode({ data, isConnectable }) {
-  const [active, setActive] = useState(false);
 
   /**
    * Calculates the size of a text based on its length.
@@ -22,23 +20,15 @@ function DependencyNode({ data, isConnectable }) {
     return size;
   };
 
-  /**
-  * Toggles the active state of an element if the event is a double click and the element is not disabled.
-  * @param {object} event - The event object representing the click event.
-  */
-  const clickHandler = (event) => {
-    if (event.detail == 2 && !data.disabled) {
-      setActive(!active); //for refresh
-      data.active = !data.active;
-    }
-  }
-
   return (
     <StoredContext.Consumer>
-      {() => (<div className={"dependency-node flex justify-center items-center overflow-hidden" + (data.active ? " dependency-node-active" : "") + (data.stepActive ? " dependency-node-stepactive" : "") + (data.stepDone ? " dependency-node-stepdone" : "")} onClick={clickHandler}>
+      {() => (<div className={"dependency-node flex justify-center items-center overflow-hidden" + (data.active ? " dependency-node-active" : "") + (data.stepActive ? " dependency-node-stepactive" : "") + (data.stepDone ? " dependency-node-stepdone" : "")}>
         <div id="text" name="text" className="flex flex-col justify-center items-center">
           <label className='dependency-label' htmlFor="text" style={{ fontSize: setSize(data.label) + 'px' }}>{data.label}</label>
-          <input className='max-w-3 focus:outline-none' type="text" rows={1} ref={data.ref} />
+          <div className="max-w-3 focus:outline-none !overflow-hidden">
+            <p className="scroll-text" ref={data.ref} style={{ minHeight: setSize(data.label) + 'px' }}>{data.text}</p>
+          </div>
+          {/* <input className='max-w-3 focus:outline-none scroll-text' type="text" rows={1} ref={data.ref} /> */}
         </div>
         <Handle type="target" position={Position.Top} id="a" isConnectable={isConnectable} />
         <Handle type="target" position={Position.Left} id="c" isConnectable={isConnectable} />

@@ -56,7 +56,7 @@ export default function EnterGrammar() {
         grammar.nonTerminals.push(lhs);
       }
 
-      if (rhs === undefined || rhs === "") {
+      if (rhs === undefined || rhs === "" || lhs === "S'" || rhs.includes('$')) {
         return true;
       }
 
@@ -90,6 +90,7 @@ export default function EnterGrammar() {
     }
 
     setGrammarObj(grammar);
+    console.log(typeof grammar.startSymbol);
 
     return false;
   };

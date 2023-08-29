@@ -6,6 +6,7 @@ import ReactFlow, { Controls, MarkerType, ReactFlowProvider, addEdge, useNodesSt
 import 'reactflow/dist/style.css';
 import '../layout/css/DependencyGraph.css';
 import DependencyNode from '../components/DependencyNode';
+import DependencyNodeReadOnly from '../components/DependencyNodeReadOnly';
 import dagre from 'dagre';
 import NullableTable from '../components/NullableTable';
 import { highlightProduction, stopSteps } from '../utils/utils';
@@ -16,7 +17,7 @@ const initialEdges = [];
 
 // Description of each step in the graph creation process
 const stepDesc = [
-  { 'key': 0, 'msg': 'Create the Variable Dependency Graph for this grammar. \nMark the nodes with a double click if they can be evaluated to epsilon. \nIn addition, enter the terminal symbols in the text fields with which the nonterminals can start (use the following pattern: <terminal>, <terminal>, ...). \nAlso connect the nodes to show the dependencies of the nonterminals (A is dependent on B: B -> A).' },
+  { 'key': 0, 'msg': 'Create the Variable Dependency Graph for this grammar. \nMark the nodes with a double click if they can be evaluated to epsilon. \nIn addition, enter the terminal symbols in the text fields with which the nonterminals can start (use the following pattern: <terminal>, <terminal>, ...). \nAlso connect the nodes via the 3 handles to show the dependencies of the nonterminals (A is dependent on B: B -> A). Edges can be removed by sliding them into the void.' },
   { 'key': 1, 'msg': 'Mark each node where the nonterminal can be empty.' },
   { 'key': 2, 'msg': 'Add all the dependencies of the nonterminals. A nonterminal is dependent on other nonterminals if they come first on the right side of production.\nIf this nonterminal is empty, there may be another dependency on subsequent nonterminals.' },
   { 'key': 3, 'msg': 'Enter the terminal symbols in the text fields with which the nonterminals can start. Use the following pattern: <terminal>, <terminal>, ... ' },
@@ -24,7 +25,10 @@ const stepDesc = [
 ]
 
 // Node types for ReactFlow visualization
-const nodeTypes = { dependencyNode: DependencyNode };
+const nodeTypes = {
+  dependencyNode: DependencyNode,
+  dependencyNodeReadOnly: DependencyNodeReadOnly
+};
 const edgeTypes = { type: 'default' };
 
 const timeOut = [];
@@ -126,11 +130,14 @@ export default function DependencyGraph() {
     if (handleCheck()) {
       setActiveStep((prevActiveStep) => prevActiveStep + 1);
       nodes.forEach(node => {
+        node.type = 'dependencyNodeReadOnly';
         node.data.text = node.data.ref.current.value;
       });
       setStoredEdges(edges);
       setStoredNodes(nodes);
     }
+
+    console.log(nodes);
   };
 
   /**
@@ -247,6 +254,10 @@ export default function DependencyGraph() {
     );
     setActiveRow(activeRow.map(() => { return false }));
     setRefreshRow(-1);
+    errorRefEmpty.current.hidden = true;
+    errorRefMany.current.hidden = true;
+    errorRefWrong.current.hidden = true;
+    errorRef.current.hidden = true;
   }
 
   /**
@@ -479,7 +490,7 @@ export default function DependencyGraph() {
       // Find the difference between the expected labels and the user input for the current non-terminal
       const difference = new Set([...label.get(symbol)].filter(x => !userInput.includes(x)));
 
-      // Check if the number of labels for the current non-terminal node matches the user input
+      // Check if the number of terminals for the current non-terminal node matches the user input
       if (label.get(symbol).size > userInput.length) {
         setSolved(false);
         nodes[index].data.ref.current.classList.add("dependency-label-false");
@@ -494,6 +505,7 @@ export default function DependencyGraph() {
         // Check if the nullable marker matches the user's selection
         if (!(nullableSet.has(symbol) === nodes[index].data.active)) {
           errorNodesEmpty.push(symbol);
+          correct = false;
         }
         if (difference.size === 0) {
           nodes[index].data.ref.current.classList.add("dependency-label-correct");
@@ -565,6 +577,7 @@ export default function DependencyGraph() {
     if (!correct) {
       solvedCorrect = false;
     } else {
+      setRefresh(!refresh);
       setStepState(4);
     }
     setSolved(solvedCorrect);

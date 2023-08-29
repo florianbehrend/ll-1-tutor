@@ -21,11 +21,12 @@ var firstProduction = false;
 const findReachableSymbols = (grammar) => {
   const nonTerminals = grammar.nonTerminals;
   const reachable = new Set([grammar.startSymbol]);
+  const toCheck = new Set([grammar.startSymbol]);
 
   while (true) {
     const symbolsAdded = new Set();
 
-    for (const symbol of reachable) {
+    for (const symbol of toCheck) {
       const productions = grammar.productions.filter(x => {
         return x.lhs === symbol;
       });
@@ -37,13 +38,14 @@ const findReachableSymbols = (grammar) => {
           }
         }
       }
+      toCheck.delete(symbol);
     }
 
     if (symbolsAdded.size === 0) {
       break;
     }
 
-    symbolsAdded.forEach((symbol) => reachable.add(symbol));
+    symbolsAdded.forEach((symbol) => {reachable.add(symbol); toCheck.add(symbol);});
   }
 
   return reachable;

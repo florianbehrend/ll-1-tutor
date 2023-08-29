@@ -277,7 +277,7 @@ export default function EmptySet() {
                 checkBoxRef.current[index].current.checked = false;
             }
             checkBoxRef.current[index].current.classList.add("accent-green-500", "border-green-500");
-            checkBoxRef.current[index].current.classList.remove("accent-yellow-200");
+            checkBoxRef.current[index].current.classList.remove("accent-yellow-200", "accent-red-500", "border-red-500");
         });
 
         // Set the state to the last step and update the nullable set

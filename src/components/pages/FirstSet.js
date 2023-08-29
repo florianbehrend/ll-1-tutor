@@ -6,6 +6,7 @@ import '../layout/css/EnterGrammar.css';
 import { TextField } from '@mui/material';
 import ReactFlow, { ReactFlowProvider, useNodesState, useEdgesState } from 'reactflow';
 import DependencyNode from '../components/DependencyNode';
+import DependencyNodeReadOnly from '../components/DependencyNodeReadOnly';
 import { stopTimeout, resetCorrectTemp } from '../utils/utils';
 
 const stepDesc = [
@@ -16,11 +17,19 @@ const stepDesc = [
 ]
 
 var correctTemp = {};
+var cur_id;
 const nodesTodo = [];
 const timeOut = [];
 
-const nodeTypes = { dependencyNode: DependencyNode };
+const nodeTypes = {
+  dependencyNode: DependencyNode,
+  dependencyNodeReadOnly: DependencyNodeReadOnly
+};
 const edgeTypes = { type: 'default' };
+
+function setId(id) {
+  cur_id = id;
+}
 
 /**
  * Initialize the 'correctTemp' object for each non-terminal in the grammar.
@@ -346,6 +355,7 @@ export default function FirstSet({ children }) {
     resetCorrectTemp(correctTemp);
     resetNodes();
     nodesTodo.length = 0;
+    cur_id = undefined;
   }
 
   /**
@@ -400,6 +410,21 @@ export default function FirstSet({ children }) {
     });
   }, [reactFlowInstance]);
 
+   /**
+   * The `insertEpsilon` function inserts the epsilon symbol (ε) at the current cursor position in a text
+   * input field.
+   */
+   const insertEpsilon = () => {
+    console.log(cur_id);
+    if(cur_id !== undefined){
+      cur_id.target.value = cur_id.target.value + 'ε';
+    }
+    //const text = grammarRef.current.value;
+    //grammarRef.current.value = text.slice(0, grammarRef.current.selectionStart) + 'ε' + text.slice(grammarRef.current.selectionStart)
+    //handleChange();
+  }
+
+
   return (
     <div className='flex flex-col w-full h-full'>
       {children}
@@ -435,11 +460,11 @@ export default function FirstSet({ children }) {
             </ReactFlowProvider>
           </div>
         </div>
-        <div className='flex flex-col w-2/3'>
+        <div className='flex flex-col items-center w-2/3'>
           {grammarObj.nonTerminals.slice(1).map((item, index) => (
-            <div className='flex items-center m-2'>
+            <div className='flex items-center m-2 w-full'>
               <p className='w-1/5 px-5 truncate hover:text-clip z-10 hover:overflow-visible' key={'$First' + item}>FIRST ({item})</p>
-              <TextField inputRef={elementsRef.current[index]} key={item} className='w-4/5'
+              <TextField inputRef={elementsRef.current[index]} key={item} className='w-4/5' onBlur={setId}
                 sx={{
                   "& .MuiOutlinedInput-root": {
                     "& > fieldset": correctTemp[item].stepActive ? { borderColor: "#0ea5e9", borderWidth: 2 } : { borderColor: "#2f2f2f", borderWidth: 2 },
@@ -458,6 +483,7 @@ export default function FirstSet({ children }) {
               />
             </div>
           ))}
+          <Button className='' onClick={insertEpsilon}>ε</Button>
         </div>
       </div>
       <div className=''>
