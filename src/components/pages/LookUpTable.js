@@ -1,9 +1,10 @@
 import React, { useContext, useState, useRef, createRef } from 'react';
 import Button from "../components/Button";
+import Popup from "../components/Popup";
 import { StepperContext } from "../context/StepperContext";
 import { StoredContext } from '../context/StoredContext';
 import { calculateFirstSet, highlightProduction, removeHighlight, removeHighlightAll } from '../utils/utils';
-import { TextField } from '@mui/material';
+import { TextField, Tooltip } from '@mui/material';
 import '../layout/css/LookUpTable.css';
 
 const stepDesc = [
@@ -26,7 +27,7 @@ function check(grammar) {
     if (correctTemp[item] === undefined) {
       correctTemp[item] = [];
       for (let i = 0; i <= grammar.terminals.filter((sym) => sym !== 'ε').length; i++) {
-        correctTemp[item].push({ correct: false, error: false, helpertext: "wrong elements", stepActive: false });
+        correctTemp[item].push({ correct: false, error: false, helpertext: "", stepActive: false });
       }
     }
   });
@@ -119,9 +120,22 @@ export default function LookUpTable({ children }) {
   const productionFieldRef = useRef();
   const firstSetRef = useRef();
   const followSetRef = useRef();
+  const errorRef = useRef();
+  const errorRefLess = useRef();
+  const errorRefMuch = useRef();
 
   const verticalTable = grammarObj.terminals.length >= grammarObj.nonTerminals.length;
   check(grammarObj);
+
+  const [isPopupOpen, setIsPopupOpen] = useState(false);
+
+  const openPopup = () => {
+    setIsPopupOpen(true);
+  };
+
+  const closePopup = () => {
+    setIsPopupOpen(false);
+  };
 
   /**
    * Function to handle the "Next" button click
@@ -147,12 +161,13 @@ export default function LookUpTable({ children }) {
    * Handles the completion of solving the LL(1) parsing table.
    */
   const handleSolved = () => {
+    reset();
     const lookUpTable = calculateLookUpTable(grammarObj, firstSet, followSet, indexMap);
 
     // Populate the input cells of the parsing table with the calculated values
     Object.keys(lookUpTable).slice(1).forEach((nonTerminal, index) => {
       Object.keys(lookUpTable[nonTerminal]).forEach((terminal) => {
-        const ind = terminal === '$' ? grammarObj.terminals.length - 1 : grammarObj.terminals.filter((sym) => sym !== 'ε').indexOf(terminal);
+        const ind = terminal === '$' ? grammarObj.terminals.filter((sym) => sym !== 'ε').length : grammarObj.terminals.filter((sym) => sym !== 'ε').indexOf(terminal);
         if (verticalTable) {
           tableRefVert.current[ind][index].current.value = [...lookUpTable[nonTerminal][terminal]].join(", ");
         } else {
@@ -182,6 +197,10 @@ export default function LookUpTable({ children }) {
     const terminalsTemp = grammarObj.terminals.filter((sym) => sym !== 'ε');
     terminalsTemp.push("$");
 
+    let errorMuch = "";
+    let errorLess = "";
+    let error = "";
+
     // Iterate through each non-terminal and terminal combination
     grammarObj.nonTerminals.slice(1).forEach((nonTerminal, index) => {
       lookUpTableCheck[nonTerminal] = {};
@@ -189,10 +208,10 @@ export default function LookUpTable({ children }) {
       terminalsTemp.forEach((terminal) => {
         // Initialize the lookup table check for the current non-terminal and terminal
         if (lookUpTable[nonTerminal][terminal] === undefined) { lookUpTable[nonTerminal][terminal] = new Set() }
-        
+
         // Determine the index for the terminal
-        const ind = terminal === '$' ? (grammarObj.terminals.includes('ε') ? grammarObj.terminals.length - 1 : grammarObj.terminals.length) : grammarObj.terminals.filter((sym) => sym !== 'ε').indexOf(terminal);
-        
+        const ind = terminal === '$' ? grammarObj.terminals.filter((sym) => sym !== 'ε').length : grammarObj.terminals.filter((sym) => sym !== 'ε').indexOf(terminal);
+
         // Retrieve user-entered values from the parsing table cells
         if (verticalTable) {
           lookUpTableCheck[nonTerminal][terminal] = new Set(tableRefVert.current[ind][index].current.value.split(", ").map((symbol) => symbol.trim()).filter(x => x !== "").map((symbol) => parseInt(symbol)));
@@ -202,18 +221,30 @@ export default function LookUpTable({ children }) {
 
         // Find the difference between the calculated lookup table and the user-entered values
         const difference = new Set([...lookUpTableCheck[nonTerminal][terminal]].filter(x => !lookUpTable[nonTerminal][terminal].has(x)));
-        
+
         // Check correctness
         var correct = false;
         if (lookUpTable[nonTerminal][terminal].size > lookUpTableCheck[nonTerminal][terminal].size) {
           setSolved(false);
+          errorLess !== "" && (errorLess = errorLess + ", ");
+          errorLess = errorLess + "[[" + nonTerminal + "],[" + terminal + "]]";
+          correctTemp[nonTerminal][ind].helpertext = "missing elements";
         } else if (lookUpTable[nonTerminal][terminal].size < lookUpTableCheck[nonTerminal][terminal].size) {
           setSolved(false);
+          errorMuch !== "" && (errorMuch = errorMuch + ", ");
+          errorMuch = errorMuch + "[[" + nonTerminal + "],[" + terminal + "]]";
+          correctTemp[nonTerminal][ind].helpertext = "too many elements";
         } else {
           correct = difference.size === 0;
+          if (!correct) {
+            error !== "" && (error = error + ", ");
+            error = error + "[[" + nonTerminal + "],[" + terminal + "]]";
+            correctTemp[nonTerminal][ind].helpertext = "wrong elements";
+          }
         }
         correctTemp[nonTerminal][ind].error = !correct;
         correctTemp[nonTerminal][ind].correct = correct;
+
         if (!correct) {
           solvedCorrect = false;
         }
@@ -225,6 +256,10 @@ export default function LookUpTable({ children }) {
     setSolved(solvedCorrect);
     if (solvedCorrect) {
       setParsingTable(lookUpTable);
+    } else {
+      error !== "" && (errorRef.current.textContent = "Wrong content of field: " + error);
+      errorMuch !== "" && (errorRefMuch.current.textContent = "Too many elements: " + errorMuch);
+      errorLess !== "" && (errorRefLess.current.textContent = "Too less elements: " + errorLess);
     }
     return solvedCorrect;
   };
@@ -241,6 +276,9 @@ export default function LookUpTable({ children }) {
     // If there are no more productions to process and it's the first step, move to the next step state
     if (prodTodo.length === 0 && stepState === 1) { setStepState(stepState + 1) };
     followSetRef.current.textContent = "";
+    errorRef.current.textContent = "";
+    errorRefLess.current.textContent = "";
+    errorRefMuch.current.textContent = "";
 
     switch (stepState) {
       case 0:
@@ -260,7 +298,7 @@ export default function LookUpTable({ children }) {
 
       case 1:
         const { lhs, rhs } = prodTodo.shift();
-        
+
         // Process production only if it's not the starting symbol "S'"
         if (lhs !== "S'") {
           lastLhs = lhs;
@@ -268,7 +306,7 @@ export default function LookUpTable({ children }) {
 
           const firstSetTemp = calculateFirstSet(rhs, grammarObj, firstSet);
           firstSetRef.current.textContent = "First Set of Production " + lhs + " -> " + rhs.join(" ") + " : " + [...firstSetTemp].map(x => x === "" ? 'ε' : x).join(", ");
-          
+
           // Populate the parsing table entries based on the First Set
           firstSetTemp.forEach(terminal => {
             if (terminal !== '') {
@@ -299,7 +337,7 @@ export default function LookUpTable({ children }) {
           // Update the parsing table entries for the current production
           firstSetTemp.forEach(terminal => {
             if (terminal !== '') {
-              const ind = terminal === '$' ? grammarObj.terminals.length - 1 : grammarObj.terminals.filter((sym) => sym !== 'ε').indexOf(terminal);
+              const ind = terminal === '$' ? grammarObj.terminals.filter((sym) => sym !== 'ε').length : grammarObj.terminals.filter((sym) => sym !== 'ε').indexOf(terminal);
 
               if (verticalTable) {
                 tableRefVert.current[ind][index].current.value = [...parsingTable[lhs][terminal]].join(", ");
@@ -317,7 +355,7 @@ export default function LookUpTable({ children }) {
         highlightProduction(productionRef.current[prodIndex], 0, prodIndex, productionFieldRef, timeOut);
         modifiedList.push(prodIndex);
         prodIndex++;
-        
+
         if (prodTodo.length === 0) { setStepState(stepState + 1) };
         break;
 
@@ -339,7 +377,7 @@ export default function LookUpTable({ children }) {
   const removeTableHighlight = () => {
     lastTerminal.forEach(terminal => {
       // Determine the index for the terminal
-      const ind = terminal === '$' ? grammarObj.terminals.length - 1 : grammarObj.terminals.filter((sym) => sym !== 'ε').indexOf(terminal);
+      const ind = terminal === '$' ? grammarObj.terminals.filter((sym) => sym !== 'ε').length : grammarObj.terminals.filter((sym) => sym !== 'ε').indexOf(terminal);
       correctTemp[lastLhs][ind].stepActive = false;
     })
     setRefresh(!refresh);
@@ -358,17 +396,25 @@ export default function LookUpTable({ children }) {
     removeHighlightAll(productionRef);
     removeTableHighlight();
     grammarObj.nonTerminals.slice(1).forEach((item) => {
-      correctTemp[item].map(x => { x.correct = false; x.error = false; x.helpertext = "wrong elements"; x.stepActive = false; });
+      correctTemp[item].map(x => { x.correct = false; x.error = false; x.helpertext = ""; x.stepActive = false; });
     });
 
     setRefresh(!refresh);
     setSolved(false);
-    
+
     // Clear parsing table values
     if (parsingTable !== undefined) {
       Object.keys(parsingTable).slice(1).forEach((nonTerminal, index) => {
         Object.keys(parsingTable[nonTerminal]).forEach((terminal) => {
-          const ind = terminal === '$' ? grammarObj.terminals.length - 1 : grammarObj.terminals.filter((sym) => sym !== 'ε').indexOf(terminal);
+          const ind = terminal === '$' ? grammarObj.terminals.filter((sym) => sym !== 'ε').length : grammarObj.terminals.filter((sym) => sym !== 'ε').indexOf(terminal);
+          console.log(verticalTable);
+          console.log(tableRefVert);
+          console.log(tableRef);
+          console.log(ind);
+          console.log(index);
+          console.log(terminal);
+          console.log(grammarObj.terminals);
+          console.log(parsingTable);
           if (verticalTable) {
             tableRefVert.current[ind][index].current.value = "";
           } else {
@@ -386,6 +432,9 @@ export default function LookUpTable({ children }) {
 
     firstSetRef.current.textContent = "";
     followSetRef.current.textContent = "";
+    errorRef.current.textContent = "";
+    errorRefLess.current.textContent = "";
+    errorRefMuch.current.textContent = "";
   }
 
   const indexMap = [];
@@ -393,8 +442,15 @@ export default function LookUpTable({ children }) {
   return (
     <div className='flex flex-col w-full h-full'>
       {children}
-      <div className='border-2 border-solid rounded-lg border-color mb-1 p-2'>
-        <p className='whitespace-pre-line'>{stepDesc[stepState].msg}</p>
+      <div className='border-2 border-solid rounded-lg border-color mb-1 p-2 flex justify-center items-center'>
+        <p className='whitespace-pre-line w-11/12'>{stepDesc[stepState].msg}</p>
+        <div className='w-1/12'>
+          <button onClick={openPopup} className='border-2 border-solid text-yellow-200 w-10 h-10 rounded-lg text-xl font-bold'>?</button>
+          {isPopupOpen && <Popup onClose={closePopup} title={"Lookahead Table"}
+            text={'A lookahead table also known as "LL(1) parsing table," is a data structure used in syntax analysis of context-free grammars, particularly for predictive parsing. It assists in determining the appropriate production rule to apply during the parsing process based on the current nonterminal being expanded and the current input symbol (lookahead).' +
+              "\n\n1.\t\tFor each production rule of a nonterminal A:\nFor each terminal symbol 'a' in the FIRST set of A's production rule, add the production rule to the cell corresponding to the row of A and the column of 'a' in the lookahead table.\n" +
+              "\n2.\t\tIf ε is in the FIRST set of a nonterminal A, for each terminal symbol 'b' in the FOLLOW set of A, add the production rule to the cell corresponding to the row of A and the column of 'b' in the lookahead table."} />}
+        </div>
       </div>
       <div className='flex h-full'>
         <div className='w-1/3'>
@@ -454,77 +510,92 @@ export default function LookUpTable({ children }) {
                   <tr class="border-b  ">
                     <td className='nonTerminal-table flex justify-center'><p>{item}</p></td>
                     {grammarObj.terminals.filter((sym) => sym !== 'ε').map((sym, ind) => (
+                      <Tooltip title={correctTemp[item][ind].error ? correctTemp[item][ind].helpertext : "[[" + item + "],[" + sym + "]]"}>
+                        <td className='border-r border-l'><TextField sx={{
+                          "& .MuiOutlinedInput-root:hover": {
+                            "& > fieldset": { borderColor: "#fde047", borderWidth: 1 },
+                          },
+                          "& .MuiOutlinedInput-root.Mui-disabled": {
+                            "& > fieldset": correctTemp[item][ind].correct ? { borderColor: "#22c55e", borderWidth: 2 } : { borderColor: "#2f2f2f", borderWidth: 2 },
+                          },
+                          "& .MuiOutlinedInput-root": {
+                            "& > fieldset": correctTemp[item][ind].correct ? { borderColor: "#22c55e", borderWidth: 1 } : correctTemp[item][ind].stepActive ? { borderColor: "#0ea5e9", borderWidth: 1 } : {},
+                          },
+                        }} inputRef={tableRef.current[index][ind]}
+                          error={correctTemp[item][ind].error ? true : false}
+                          disabled={correctTemp[item][ind].correct || stepState !== 0}
+                        /></td>
+                      </Tooltip>
+                    ))}
+                    <Tooltip title={correctTemp[item][grammarObj.terminals.filter((sym) => sym !== 'ε').length].error ? correctTemp[item][grammarObj.terminals.filter((sym) => sym !== 'ε').length].helpertext : "[[" + item + "],[$]]"}>
+
                       <td className='border-r border-l'><TextField sx={{
                         "& .MuiOutlinedInput-root:hover": {
                           "& > fieldset": { borderColor: "#fde047", borderWidth: 1 },
                         },
                         "& .MuiOutlinedInput-root.Mui-disabled": {
-                          "& > fieldset": correctTemp[item][ind].correct ? { borderColor: "#22c55e", borderWidth: 2 } : { borderColor: "#2f2f2f", borderWidth: 2 },
+                          "& > fieldset": correctTemp[item][grammarObj.terminals.filter((sym) => sym !== 'ε').length].correct ? { borderColor: "#22c55e", borderWidth: 2 } : { borderColor: "#2f2f2f", borderWidth: 2 },
                         },
                         "& .MuiOutlinedInput-root": {
-                          "& > fieldset": correctTemp[item][ind].correct ? { borderColor: "#22c55e", borderWidth: 1 } : correctTemp[item][ind].stepActive ? { borderColor: "#0ea5e9", borderWidth: 1 } : {},
+                          "& > fieldset": correctTemp[item][grammarObj.terminals.filter((sym) => sym !== 'ε').length].correct ? { borderColor: "#22c55e", borderWidth: 1 } : correctTemp[item][grammarObj.terminals.filter((sym) => sym !== 'ε').length].stepActive ? { borderColor: "#0ea5e9", borderWidth: 1 } : {},
                         },
-                      }} inputRef={tableRef.current[index][ind]}
-                        error={correctTemp[item][ind].error ? true : false}
-                        disabled={stepState !== 0}
+                      }} inputRef={tableRef.current[index][grammarObj.terminals.filter((sym) => sym !== 'ε').length]}
+                        error={correctTemp[item][grammarObj.terminals.filter((sym) => sym !== 'ε').length].error ? true : false}
+                        disabled={correctTemp[item][grammarObj.terminals.filter((sym) => sym !== 'ε').length].correct || stepState !== 0}
+
                       /></td>
-                    ))}
-                    <td className='border-r border-l'><TextField sx={{
-                      "& .MuiOutlinedInput-root:hover": {
-                        "& > fieldset": { borderColor: "#fde047", borderWidth: 1 },
-                      },
-                      "& .MuiOutlinedInput-root.Mui-disabled": {
-                        "& > fieldset": correctTemp[item][grammarObj.terminals.filter((sym) => sym !== 'ε').length].correct ? { borderColor: "#22c55e", borderWidth: 2 } : { borderColor: "#2f2f2f", borderWidth: 2 },
-                      },
-                      "& .MuiOutlinedInput-root": {
-                        "& > fieldset": correctTemp[item][grammarObj.terminals.filter((sym) => sym !== 'ε').length].correct ? { borderColor: "#22c55e", borderWidth: 1 } : correctTemp[item][grammarObj.terminals.filter((sym) => sym !== 'ε').length].stepActive ? { borderColor: "#0ea5e9", borderWidth: 1 } : {},
-                      },
-                    }} inputRef={tableRef.current[index][grammarObj.terminals.filter((sym) => sym !== 'ε').length]}
-                      error={correctTemp[item][grammarObj.terminals.filter((sym) => sym !== 'ε').length].error ? true : false}
-                      disabled={stepState !== 0}
-                    /></td>
+                    </Tooltip>
+
                   </tr>
                 ))}
               </tbody>}
               {verticalTable && <tbody>
-                {grammarObj.terminals.filter((sym) => sym !== 'ε').map((item, index) => (
+                {grammarObj.terminals.filter((sym) => sym !== 'ε').map((sym, index) => (
                   <tr class="border-b  ">
-                    <td className='nonTerminal-table flex justify-center'><p>{item}</p></td>
+                    <td className='nonTerminal-table flex justify-center'><p>{sym}</p></td>
                     {grammarObj.nonTerminals.slice(1).map((item, ind) => (
-                      <td className='border-r border-l'><TextField sx={{
-                        "& .MuiOutlinedInput-root:hover": {
-                          "& > fieldset": { borderColor: "#fde047", borderWidth: 1 },
-                        },
-                        "& .MuiOutlinedInput-root.Mui-disabled": {
-                          "& > fieldset": correctTemp[item][index].correct ? { borderColor: "#22c55e", borderWidth: 2 } : { borderColor: "#2f2f2f", borderWidth: 2 },
-                        },
-                        "& .MuiOutlinedInput-root": {
-                          "& > fieldset": correctTemp[item][index].correct ? { borderColor: "#22c55e", borderWidth: 1 } : correctTemp[item][index].stepActive ? { borderColor: "#0ea5e9", borderWidth: 1 } : {},
-                        },
-                      }} inputRef={tableRefVert.current[index][ind]}
-                        error={correctTemp[item][index].error ? true : false}
-                        disabled={stepState !== 0}
-                      /></td>
+                      <Tooltip title={correctTemp[item][index].error ? correctTemp[item][index].helpertext : "[[" + item + "],[" + sym + "]]"}>
+
+                        <td className='border-r border-l'><TextField sx={{
+                          "& .MuiOutlinedInput-root:hover": {
+                            "& > fieldset": { borderColor: "#fde047", borderWidth: 1 },
+                          },
+                          "& .MuiOutlinedInput-root.Mui-disabled": {
+                            "& > fieldset": correctTemp[item][index].correct ? { borderColor: "#22c55e", borderWidth: 2 } : { borderColor: "#2f2f2f", borderWidth: 2 },
+                          },
+                          "& .MuiOutlinedInput-root": {
+                            "& > fieldset": correctTemp[item][index].correct ? { borderColor: "#22c55e", borderWidth: 1 } : correctTemp[item][index].stepActive ? { borderColor: "#0ea5e9", borderWidth: 1 } : {},
+                          },
+                        }} inputRef={tableRefVert.current[index][ind]}
+                          error={correctTemp[item][index].error ? true : false}
+                          disabled={correctTemp[item][index].correct || stepState !== 0}
+                        /></td>
+                      </Tooltip>
+
                     ))}
                   </tr>
                 ))}
                 <tr class="border-b  ">
                   <td className='nonTerminal-table flex justify-center'><p>$</p></td>
                   {grammarObj.nonTerminals.slice(1).map((item, ind) => (
-                    <td className='border-r border-l'><TextField sx={{
-                      "& .MuiOutlinedInput-root:hover": {
-                        "& > fieldset": { borderColor: "#fde047", borderWidth: 1 },
-                      },
-                      "& .MuiOutlinedInput-root.Mui-disabled": {
-                        "& > fieldset": correctTemp[item][grammarObj.terminals.filter((sym) => sym !== 'ε').length].correct ? { borderColor: "#22c55e", borderWidth: 2 } : { borderColor: "#2f2f2f", borderWidth: 2 },
-                      },
-                      "& .MuiOutlinedInput-root": {
-                        "& > fieldset": correctTemp[item][grammarObj.terminals.filter((sym) => sym !== 'ε').length].correct ? { borderColor: "#22c55e", borderWidth: 1 } : correctTemp[item][grammarObj.terminals.filter((sym) => sym !== 'ε').length].stepActive ? { borderColor: "#0ea5e9", borderWidth: 1 } : {},
-                      },
-                    }} inputRef={tableRefVert.current[grammarObj.terminals.filter((sym) => sym !== 'ε').length][ind]}
-                      error={correctTemp[item][grammarObj.terminals.filter((sym) => sym !== 'ε').length].error ? true : false}
-                      disabled={stepState !== 0}
-                    /></td>
+                    <Tooltip title={correctTemp[item][grammarObj.terminals.filter((sym) => sym !== 'ε').length].error ? correctTemp[item][grammarObj.terminals.filter((sym) => sym !== 'ε').length].helpertext : "[[" + item + "],[$]]"}>
+
+                      <td className='border-r border-l'><TextField sx={{
+                        "& .MuiOutlinedInput-root:hover": {
+                          "& > fieldset": { borderColor: "#fde047", borderWidth: 1 },
+                        },
+                        "& .MuiOutlinedInput-root.Mui-disabled": {
+                          "& > fieldset": correctTemp[item][grammarObj.terminals.filter((sym) => sym !== 'ε').length].correct ? { borderColor: "#22c55e", borderWidth: 2 } : { borderColor: "#2f2f2f", borderWidth: 2 },
+                        },
+                        "& .MuiOutlinedInput-root": {
+                          "& > fieldset": correctTemp[item][grammarObj.terminals.filter((sym) => sym !== 'ε').length].correct ? { borderColor: "#22c55e", borderWidth: 1 } : correctTemp[item][grammarObj.terminals.filter((sym) => sym !== 'ε').length].stepActive ? { borderColor: "#0ea5e9", borderWidth: 1 } : {},
+                        },
+                      }} inputRef={tableRefVert.current[grammarObj.terminals.filter((sym) => sym !== 'ε').length][ind]}
+                        error={correctTemp[item][grammarObj.terminals.filter((sym) => sym !== 'ε').length].error ? true : false}
+                        disabled={correctTemp[item][grammarObj.terminals.filter((sym) => sym !== 'ε').length].correct || stepState !== 0}
+                      /></td>
+                    </Tooltip>
+
                   ))}
                 </tr>
               </tbody>}
@@ -532,7 +603,10 @@ export default function LookUpTable({ children }) {
 
           </div>
           <p ref={firstSetRef}></p>
-          <p ref={followSetRef}></p>
+          <p ref={followSetRef} className='mb-2'></p>
+          <p ref={errorRefLess} className='text-red-500 mb-2'></p>
+          <p ref={errorRefMuch} className='text-red-500 mb-2'></p>
+          <p ref={errorRef} className='text-red-500'></p>
         </div>
       </div>
       <div className='mt-2'>

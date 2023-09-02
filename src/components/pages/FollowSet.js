@@ -1,5 +1,6 @@
 import React, { useContext, useState, useRef, createRef } from 'react';
 import Button from "../components/Button";
+import Popup from "../components/Popup";
 import { TextField } from '@mui/material';
 import { StepperContext } from "../context/StepperContext";
 import { StoredContext } from "../context/StoredContext";
@@ -141,6 +142,16 @@ export default function FollowSet({ children }) {
   const firstSetRef = useRef();
   const hasChangedRef = useRef();
 
+  const [isPopupOpen, setIsPopupOpen] = useState(false);
+
+  const openPopup = () => {
+    setIsPopupOpen(true);
+  };
+
+  const closePopup = () => {
+    setIsPopupOpen(false);
+  };
+
   /**
    * Function to handle the "Next" button click
    */
@@ -166,12 +177,12 @@ export default function FollowSet({ children }) {
     const followSet = calculateFollowSets(grammarObj, firstSet);
     // Initialize a variable to track whether all follow sets are correct
     var solvedCorrect = true;
-    
+
     // Iterate over each non-terminal symbol in the grammar
     grammarObj.nonTerminals.forEach((nonTerminal, index) => {
       // Parse user input for follow set into an array and filter out empty strings
       followSetCheck.set(nonTerminal, elementsRef.current[index].current.value.split(", ").map((symbol) => symbol.trim()).filter(x => x !== ""));
-      
+
       if (followSet[nonTerminal] !== undefined) {
         const difference = new Set([...followSet[nonTerminal]].filter(x => !followSetCheck.get(nonTerminal).includes(x)));
         var correct = false;
@@ -208,7 +219,7 @@ export default function FollowSet({ children }) {
  * Handles the solved state by toggling it and updating follow sets.
  */
   const handleSolved = () => {
-    
+
     setSolved((current) => !current);
     const followSet = calculateFollowSets(grammarObj, firstSet);
 
@@ -228,7 +239,7 @@ export default function FollowSet({ children }) {
     removeHighlightAll(productionRef);
     hasChangedRef.current.textContent = "";
     firstSetRef.current.textContent = "";
-    
+
     // Stop any ongoing timeouts
     stopTimeout(timeOut);
   }
@@ -257,7 +268,7 @@ export default function FollowSet({ children }) {
         break;
       case 1:
         Step0(initialFollowSets, grammarObj);
-        counter++;
+        //counter++;
 
         timeOut.push(setTimeout(() => {
           const index = grammarObj.productions.length - 1;
@@ -285,14 +296,18 @@ export default function FollowSet({ children }) {
               highlightProduction(productionRef.current[index], 0, index, productionFieldRef, timeOut);
               modifiedList.push(index);
               timeOut.push(setTimeout(() => { removeHighlight(productionRef, modifiedList); }, timeOutSec * 0.9));
-
+              
+              console.log(token);
               if (grammarObj.nonTerminals.includes(token)) {
                 const restOfTokens = rhs.slice(i + 1);
+                console.log(restOfTokens);
 
                 // If there are more tokens after B
                 if (restOfTokens.length > 0) {
                   const firstSetOfRest = calculateFirstSet(restOfTokens, grammarObj, firstSet);
                   const followSetOfB = updatedFollowSets[token];
+
+                  console.log(firstSetOfRest);
 
                   firstSetRef.current.textContent = "First Set of " + restOfTokens.join(" ") + " : { " + [...firstSetOfRest].join(", ") + " }";
 
@@ -314,8 +329,15 @@ export default function FollowSet({ children }) {
                 // If B is the last token or β contains ε (empty)
                 if (i === rhs.length - 1 || calculateFirstSet(rhs.slice(i + 1), grammarObj, firstSet).has('')) {
 
+                  console.log("Epsilon");
+
                   const followSetOfA = updatedFollowSets[lhs];
                   const followSetOfB = updatedFollowSets[token];
+
+                  console.log(lhs);
+                  console.log(followSetOfA);
+                  console.log(token);
+                  console.log(followSetOfB);
 
                   firstSetRef.current.textContent = "Follow Set of " + lhs + " : { " + [...followSetOfA].join(", ") + " }";
 
@@ -358,10 +380,10 @@ export default function FollowSet({ children }) {
     }
   }
 
-    /**
-   * The `reset` function resets the state and visual appearance of the application.
-   * It clears the input of the textfields.
-   */
+  /**
+ * The `reset` function resets the state and visual appearance of the application.
+ * It clears the input of the textfields.
+ */
   const reset = () => {
     setStepStateRunning(false);
     setStepState(0);
@@ -380,8 +402,15 @@ export default function FollowSet({ children }) {
   return (
     <div className='flex flex-col w-full h-full'>
       {children}
-      <div className='border-2 border-solid rounded-lg border-color mb-1 p-2'>
-        <p className='whitespace-pre-line'>{stepDesc[stepState].msg}</p>
+      <div className='border-2 border-solid rounded-lg border-color mb-1 p-2 flex justify-center items-center'>
+        <p className='whitespace-pre-line w-11/12'>{stepDesc[stepState].msg}</p>
+        <div className='w-1/12'>
+          <button onClick={openPopup} className='border-2 border-solid text-yellow-200 w-10 h-10 rounded-lg text-xl font-bold'>?</button>
+          {isPopupOpen && <Popup onClose={closePopup} title={"Follow-Set"}
+          text={'The Follow-Set refers to a set of terminal symbols that can appear immediately after occurrences of a particular nonterminal symbol in the strings derived from a context-free grammar.\n\n'+
+          'Example:\nS → a A B b\nA → c | d\nB → ε | f\n\n' + 
+          'FOLLOW(S) = {$}\nFOLLOW(A) = {f, b}\nFOLLOW(B) = {b}'}/>}
+        </div>
       </div>
       <div className='flex h-full'>
         <div className='w-1/3'>

@@ -143,7 +143,9 @@ export const calculateFirstSet = (tokens, grammarObj, firstSet) => {
         if (terminal !== 'ε') {
           firstSetTemp.add(terminal);
         } else {
-          firstSetTemp.add('');
+          if(index === tokens.length - 1){
+            firstSetTemp.add('');
+          }
           isEmpty = true;
         }
       });

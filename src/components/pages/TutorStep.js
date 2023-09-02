@@ -61,7 +61,7 @@ const TutorStepPage = () => {
     <div className="App">
       <Header className='h-1/10' />
       <Content className="flex justify-center min-h-full" containerClassName='bg-zinc-900 h-9/10'>
-        <Sidebar className='bg-zinc-900 neumophism-shadow p-4 m-2 max-w-15' />
+        <Sidebar className='bg-zinc-900 neumophism-shadow p-4 m-2 max-w-15 overflow-hidden' />
         <ThemeProvider theme={theme}>
           <div className='flex justify-center bg-zinc-900 w-5/6 neumophism-shadow m-container flex p-4'>
             {handleSteps(activeStep)}

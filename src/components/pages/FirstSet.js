@@ -1,5 +1,6 @@
 import React, { useContext, useRef, useState, createRef, useEffect } from 'react';
 import Button from "../components/Button";
+import Popup from "../components/Popup";
 import { StepperContext } from "../context/StepperContext";
 import { StoredContext } from '../context/StoredContext';
 import '../layout/css/EnterGrammar.css';
@@ -38,7 +39,7 @@ function setId(id) {
 function check(grammar) {
   grammar.nonTerminals.map((item) => {
     if (correctTemp[item] === undefined) {
-      correctTemp[item] = { correct: false, error: false, helpertext: "wrong elements", stepActive: false }
+      correctTemp[item] = { correct: false, error: false, helpertext: "wrong elements", stepActive: false, disabled: false }
     };
   });
 };
@@ -149,6 +150,17 @@ export default function FirstSet({ children }) {
   const [reactFlowInstance, setReactFlowInstance] = useState(null);
   const [stepState, setStepState] = useState(0);
   const [stepStateRunning, setStepStateRunning] = useState(false);
+
+  const [isPopupOpen, setIsPopupOpen] = useState(false);
+
+  const openPopup = () => {
+    setIsPopupOpen(true);
+  };
+
+  const closePopup = () => {
+    setIsPopupOpen(false);
+  };
+
 
   /**
    * FunFunction to handle the "Next" button click
@@ -410,13 +422,13 @@ export default function FirstSet({ children }) {
     });
   }, [reactFlowInstance]);
 
-   /**
-   * The `insertEpsilon` function inserts the epsilon symbol (ε) at the current cursor position in a text
-   * input field.
-   */
-   const insertEpsilon = () => {
+  /**
+  * The `insertEpsilon` function inserts the epsilon symbol (ε) at the current cursor position in a text
+  * input field.
+  */
+  const insertEpsilon = () => {
     console.log(cur_id);
-    if(cur_id !== undefined){
+    if (cur_id !== undefined) {
       cur_id.target.value = cur_id.target.value + 'ε';
     }
     //const text = grammarRef.current.value;
@@ -428,8 +440,15 @@ export default function FirstSet({ children }) {
   return (
     <div className='flex flex-col w-full h-full'>
       {children}
-      <div className='border-2 border-solid rounded-lg border-color mb-1 p-2'>
-        <p className='whitespace-pre-line'>{stepDesc[stepState].msg}</p>
+      <div className='border-2 border-solid rounded-lg border-color mb-1 p-2 flex justify-center items-center'>
+        <p className='whitespace-pre-line w-11/12'>{stepDesc[stepState].msg}</p>
+        <div className='w-1/12'>
+          <button onClick={openPopup} className='border-2 border-solid text-yellow-200 w-10 h-10 rounded-lg text-xl font-bold'>?</button>
+          {isPopupOpen && <Popup onClose={closePopup} title={"First-Set"}
+          text={'The First-Set refers to a set of terminal symbols that can be generated as the first symbols of strings derived from a particular grammar symbol (either a nonterminal or terminal) in a context-free grammar.\n\nExample:\n' + 
+          'S → a A B b\nA → c | d\nB → ε | f\n\n' + 
+          'FIRST(S) = {a}\nFIRST(A) = {c, d}\nFIRST(B) = {ε, f}'}/>}
+        </div>
       </div>
       <div className='flex h-full'>
         <div className='w-1/3'>

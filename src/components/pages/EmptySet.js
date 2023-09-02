@@ -1,15 +1,16 @@
 import React, { useContext, useState, useRef, createRef } from 'react';
 import Button from "../components/Button";
+import Popup from '../components/Popup';
 import { StepperContext } from "../context/StepperContext";
 import { StoredContext } from '../context/StoredContext';
 import NullableTable from '../components/NullableTable';
 import { highlightProduction, highlightCheckbox, stopSteps, highlightOpacity, removeHighlightOpacity } from '../utils/utils';
 
 const stepDesc = [
-    { 'key': 0, 'msg': 'Please check the boxes if the nonterminal is nullable.' },
-    { 'key': 1, 'msg': 'For each production rule in your grammar, check if the right-hand side of the rule consists solely of epsilon. If it does, add the left-hand side nonterminal to the Nullable set.' },
-    { 'key': 2, 'msg': 'Repeat the following step until no new nullable nonterminals are found:\nFor each production rule in your grammar where the right side consists only of nonterminals, check if all the nonterminals on the right-hand side are already in the Nullable set. If they are, add the left-hand side nonterminal to the Nullable set.' },
-    { 'key': 3, 'msg': 'Done! No new empty attributes are found, the Nullable-Set contains all the empty nonterminals in your grammar.' },
+    { 'key': 0, 'msg': 'Please check the boxes if the nonterminal is empty.' },
+    { 'key': 1, 'msg': 'For each production rule in your grammar, check if the right-hand side of the rule consists solely of epsilon. If it does, add the left-hand side nonterminal to the Empty-Set.' },
+    { 'key': 2, 'msg': 'Repeat the following step until no new empty nonterminals are found:\nFor each production rule in your grammar where the right side consists only of nonterminals, check if all the nonterminals on the right-hand side are already in the Empty-Set. If they are, add the left-hand side nonterminal to the Empty-Set.' },
+    { 'key': 3, 'msg': 'Done! No new empty attributes are found, the Empty-Set contains all the empty nonterminals in your grammar.' },
 ]
 const modifiedList = [];
 const timeOut = [];
@@ -120,9 +121,19 @@ export default function EmptySet() {
     const [refresh, setRefresh] = useState();
     const [stepStateRunning, setStepStateRunning] = useState(false);
 
+    const [isPopupOpen, setIsPopupOpen] = useState(false);
+
     const checkBoxRef = useRef(grammarObj.nonTerminals.slice(1).map(() => createRef()));
     const productionRef = useRef(grammarObj.productions.slice(0, -1).map(() => createRef()));
     const textRef = useRef();
+
+    const openPopup = () => {
+        setIsPopupOpen(true);
+    };
+
+    const closePopup = () => {
+        setIsPopupOpen(false);
+    };
 
     /**
      * The function `handleNext` updates various state variables and flags to move to the next step in a
@@ -330,8 +341,13 @@ export default function EmptySet() {
 
     return (
         <div className='flex flex-col w-full h-full'>
-            <div className='border-2 border-solid rounded-lg border-color mb-1 p-2'>
-                <p ref={textRef} className='whitespace-pre-line'>{stepDesc[stepState].msg}</p>
+            <div className='border-2 border-solid rounded-lg border-color mb-1 p-2 flex justify-center items-center'>
+                <p ref={textRef} className='whitespace-pre-line w-11/12'>{stepDesc[stepState].msg}</p>
+                <div className='w-1/12'>
+                    <button onClick={openPopup} className='border-2 border-solid text-yellow-200 w-10 h-10 rounded-lg text-xl font-bold'>?</button>
+                    {isPopupOpen && <Popup onClose={closePopup} title={"Empty Attribute"}
+                     text={"A nonterminal symbol within a context-free grammar that can derive (or expand to) an empty string, also known as the epsilon (ε) production is called empty."}/>}
+                </div>
             </div>
             <div className='flex h-full'>
                 <div className='w-1/3 border-2 border-solid rounded-lg border-color p-2 text-left overflow-scroll'>
