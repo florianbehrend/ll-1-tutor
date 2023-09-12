@@ -8,10 +8,10 @@ const labels = [
   "Enter grammar",
   "Check for non-productive and non-reachable productions",
   "Empty-Attribute",
-  "Generate Dependency-Graph",
-  "Generate First-Set",
-  "Generate Follow-Set",
-  "Generate Lookahead-Table",
+  "Dependency-Graph",
+  "First-Set",
+  "Follow-Set",
+  "Lookahead-Table",
   "LL(1) Parser Step-by-Step"
 ];
 
